@@ -92,7 +92,7 @@ Mower::Mower() {
   rainUse          = 0;      // use rain sensor?
 
   // ------ screen ------------------------------------
-  Enable_Screen    = 0;       //set to 1 if OLED SCREEN is connected to I2c2
+  Enable_Screen    = 1;       //set to 1 if OLED SCREEN is connected to I2c2
 
   // ------ DHT22Use ------------------------------------
   //DHT22Use          = 0;      // use DHT22 sensor?
@@ -148,7 +148,7 @@ Mower::Mower() {
   circleTimeForObstacle = 4000; //time while arc circle in peri obstacle avoid if no Odometry
   DistPeriObstacleAvoid = 100; //distance while arc circle in peri obstacle avoid
   perimeterMagMaxValue = 5000; // Maximum value return when near the perimeter wire (use for tracking and slowing when near wire
-  read2Coil = false;
+  read2Coil = true;
   areaToGo = 1;//initialise the areatogo to the station area
 
 
@@ -176,9 +176,9 @@ Mower::Mower() {
   maxDriftPerSecond = 0.05; //limit the stop time if small drift
   maxDurationDmpAutocalib = 60; //in sec
   delayBetweenTwoDmpAutocalib = 360; //in sec
-  yawCiblePos = 90;
-  yawCibleNeg = -90;
-  DistBetweenLane = 38;
+  yawCiblePos = 60;
+  yawCibleNeg = -60;
+  DistBetweenLane = 20;
   maxLenghtByLane = 9;  // distance to run in bylane before simulate a wire detection
   justChangeLaneDir = true;
   mowPatternCurr = MOW_LANES;
@@ -211,15 +211,15 @@ Mower::Mower() {
   stationCheckDist   = 2;    // charge station  check distance to be sure voltage is OK cm
   UseBumperDock = false; //bumper is pressed when docking or not
   dockingSpeed   =  60;   //speed docking is (percent of maxspeed)
-  autoResetActive  = 0;       // after charging reboot or not
+  autoResetActive  = 1;       // after charging reboot or not
   stationHeading  = 0;  //heading of the charging station to use when no compass
 
 
   // ------ odometry ------------------------------------
   odometryUse       = 1;       // use odometry?
-  odometryTicksPerRevolution = 2070;   // encoder ticks per one full resolution
-  odometryTicksPerCm = 29.6;  // encoder ticks per cm
-  odometryWheelBaseCm = 43;    // wheel-to-wheel distance (cm)
+  odometryTicksPerRevolution = 1145;   // encoder ticks per one full resolution
+  odometryTicksPerCm = 17;  // encoder ticks per cm
+  odometryWheelBaseCm = 30,5;    // wheel-to-wheel distance (cm)
 
   // ----- GPS -------------------------------------------
   gpsUse                     = 0;          // use GPS?
@@ -230,7 +230,7 @@ Mower::Mower() {
   // ----- other -----------------------------------------
   buttonUse         = 1;       // has digital ON/OFF button?
   RaspberryPIUse = false; // a raspberryPi is connected to USBNative port
-  mowPatternDurationMax = 120; //in minutes
+  mowPatternDurationMax = 12; //in minutes
   useMqtt = false; //select this to exchange data over mqtt protocol for homeassistant.
 
 
@@ -239,7 +239,7 @@ Mower::Mower() {
   userSwitch2       = 0;       // user-defined switch 2 (default value)
   userSwitch3       = 0;       // user-defined switch 3 (default value)
   // ----- timer -----------------------------------------
-  timerUse          = 0;       // use RTC and timer?
+  timerUse          = 1;       // use RTC and timer?
 
   // ------ mower stats-------------------------------------------
   statsOverride = false; // if set to true mower stats are overwritten - be careful
@@ -285,6 +285,27 @@ Mower::Mower() {
   // ------- wheel motors -----------------------------
   motorRightSwapDir     = false;    // inverse right motor direction?
   motorLeftSwapDir      = true;    // inverse left motor direction?
+  motorSpeedMaxRpm       = 28;   // motor wheel max RPM (WARNING: do not set too high, so there's still speed control when battery is low!)
+  motorSpeedMaxPwm    = 120;  // motor wheel max Pwm  (8-bit PWM=255, 10-bit PWM=1023)
+  motorRollDegMax    = 100;  // max. roll Deg
+  motorRollDegMin    = 20; //min. roll Deg
+  SpeedOdoMin = 50;
+  SpeedOdoMax = 120;
+  useMotorDriveBrake = false;   //for ZS-X11H BL motor driver it's possible to use the brake option for slope management
+
+  motorMowSpeedMaxPwm   = 210;    // motor mower max PWM
+  motorMowSpeedMinPwm = 150;   // motor mower minimum PWM (only for cutter modulation)
+  motorMowPowerMax = 30.0;     // motor mower max power (Watt)
+  highGrassSpeedCoeff = 0.7;  //drive speed coeff when detect high grass in by lane mode
+
+  perimeterTriggerMinSmag = 300;
+  MaxSpeedperiPwm = 10080; // speed max in PWM while perimeter tracking
+  perimeterMagMaxValue = 12000; // Maximum value return when near the perimeter wire (use for tracking and slowing when near wire
+
+  odometryTicksPerRevolution = 1145;   // encoder ticks per one full resolution
+  odometryTicksPerCm = 17;  // encoder ticks per cm
+  odometryWheelBaseCm = 30.5;    // wheel-to-wheel distance (cm)
+
 #endif
 
 #if defined (YARDFORCE)

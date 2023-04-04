@@ -18,23 +18,29 @@
 */
 #include <Wire.h>
 #include <WiFi.h>
-#include "INA226.h"
+//#include "INA226.h"
+#include <INA226_WE.h>  //Stefan
+//#define screenActive  //if uncommented, screen is active
+#ifdef screenActive
 #include "ACROBOTIC_SSD1306.h"
+#endif
 
 //********************* User Setting **********************************
-const char* ssid = "WAVLINK-N";          // put here your acces point ssid
-const char* password = "basicsheep713";  // put here the password
+const char* ssid = "Sefan WLAN 2,4GHz";          // put here your acces point ssid
+const char* password = "StefanJaninaRenkaDeik";  // put here the password
 
 //********************* setting for current sensor **********************************
 //Use to have a correct value on perricurrent (Need to change the value each time you adjust the DC DC )
-float DcDcOutVoltage = 9.0; //Check if it is needed for INA226 (Sascha) 
+
+//Stefan
+//float DcDcOutVoltage = 9.0; //Check if it is needed for INA226 (Sascha) 
+// Wert kann direkt aus dem INAPERI gelesen werden!? Stefan
 
 //********************* IP Adress Settings **********************************
-IPAddress staticIP(10, 0, 0, 155);  // put here the static IP
-IPAddress gateway(10, 0, 0, 1);     // put here the gateway (IP of your routeur)
+IPAddress staticIP(192,168,178,222);  // put here the static IP
+IPAddress gateway(192,168,178,1);     // put here the gateway (IP of your routeur)
 IPAddress subnet(255, 255, 255, 0);
-IPAddress dns(10, 0, 0, 1);  // put here one dns (IP of your routeur)
-
+IPAddress dns(192,168,178,1);  // put here one dns (IP of your routeur)
 
 #define USE_STATION 1             // a station is connected and is used to charge the mower
 #define USE_PERI_CURRENT 1        // use Feedback for perimeter current measurements? (set to '0' if not connected!)
@@ -42,24 +48,25 @@ IPAddress dns(10, 0, 0, 1);  // put here one dns (IP of your routeur)
 #define USE_RAINFLOW 0            // check the amount of rain not finish to dev on 31/08/2020
 #define WORKING_TIMEOUT_MINS 300  // timeout for perimeter switch-off if robot not in station (minutes)
 #define PERI_CURRENT_MIN 100      // minimum milliAmpere for cutting wire detection
-#define AUTO_START_SIGNAL 0       //use to start sender when mower leave station
+#define AUTO_START_SIGNAL 1       //use to start sender when mower leave station
+
+//Stefan
+//INA226 INAPERI;
+//INA226 INACHARGE;
+INA226_WE INAPERI = INA226_WE(0x40);
+INA226_WE INACHARGE = INA226_WE(0x44);  //Bridge at A1 - VSS
+
 //********************* END Settings **********************************
-
-INA226 INAPERI;
-INA226 INACHARGE;
-
 byte sigCodeInUse = 1;  //1 is the original ardumower sigcode
 int sigDuration = 104;  // send the bits each 104 microsecond (Also possible 50)
 int8_t sigcode_norm[128];
 int sigcode_size;
-
-
 hw_timer_t* timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
 
-//#define I2C_SDA 4
-//#define I2C_SCL 15
+//#define I2C_SDA 21
+//#define I2C_SCL 22
 //#define PERI_CURRENT_CHANNEL 1
 //#define MOWER_STATION_CHANNEL 2
 #define pinIN1 12      // M1_IN1  ESP32 GPIO15       ( connect this pin to L298N-IN1)
@@ -70,15 +77,14 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 #define pinIN4 18      // M1_IN4  ESP32 GPIO18       ( connect this pin to L298N-IN4)
 #define pinEnableB 19  // ENB    ESP32 GPIO19        (connect this pin to L298N-ENA)
 
-#define pinDoorOpen 4   //Not in use (Magnetic switch)
-#define pinDoorClose 5  //Not in use (Magnetic switch)
-#define pinLDR 6        //Not in use (Light Sensor)
-#define pinGreenLED 8   //Not in use
-#define pinRedLED 9     //Not in use
+#define pinDoorOpen 34   //Not in use (Magnetic switch)
+#define pinDoorClose 35  //Not in use (Magnetic switch)
+#define pinLDR 32        //Not in use (Light Sensor)
+#define pinGreenLED 25   //Not in use
+#define pinRedLED 9  26  //Not in use
 
 //#define pinPushButton 34  //           (connect to Button) //R1 2.2K R2 3.3K
 //#define pinRainFlow 35    //           (connect to Rain box) //R3 2.2K R4 3.3K
-
 
 // code version
 #define VER "ESP32 3.0"
@@ -88,25 +94,23 @@ boolean enableSenderA = false;  //OFF on start to autorise the reset
 boolean enableSenderB = false;  //OFF on start to autorise the reset
 //boolean WiffiRequestOn = true;
 
-
 int timeSeconds = 0;
 unsigned long nextTimeControl = 0;
 unsigned long nextTimeInfo = 0;
 unsigned long nextTimeSec = 0;
 unsigned long nextTimeCheckButton = 0;
 int workTimeMins = 0;
-//boolean StartButtonProcess = false;
 
+//boolean StartButtonProcess = false;
 //int Button_pressed = 0;
 
-
-float PeriCurrent = 0;
-float ChargeCurrent = 0;
-float busvoltage1 = 0;
-
-float shuntvoltage2 = 0;
-float busvoltage2 = 0;
-float loadvoltage2 = 0;
+float PeriCurrent = 0.0;
+float ChargeCurrent = 0.0;
+float busvoltage1 = 0.0;
+float shuntvoltage2 = 0.0;
+float busvoltage2 = 0.0;
+float loadvoltage2 = 0.0;
+float DcDcOutVoltage = 0.0;  //Stefan
 
 //*********************  Sigcode list *********************************************
 // must be multiple of 2 !
@@ -169,7 +173,6 @@ String IPAddress2String(IPAddress address) {
   return String(address[0]) + "." + String(address[1]) + "." + String(address[2]) + "." + String(address[3]);
 }
 
-
 void changeArea(byte areaInMowing) {  // not finish to dev
   step = 0;
   enableSenderA = false;
@@ -228,7 +231,6 @@ void changeArea(byte areaInMowing) {  // not finish to dev
 }
 
 void connection() {
-  oled.clearDisplay();
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -236,8 +238,15 @@ void connection() {
   WiFi.begin(ssid, password);
   for (int i = 0; i < 60; i++) {
     if (WiFi.status() != WL_CONNECTED) {
-      oled.setTextXY(0, 0);
-      oled.putString("Try connecting");
+
+     #ifdef screenActive
+       oled.clearDisplay();  //Stefan  
+       oled.setTextXY(0, 0);
+       oled.putString("Try connecting");
+     #else
+     Serial.println("Try connecting");
+     #endif
+
       delay(250);
     }
   }
@@ -247,111 +256,183 @@ void connection() {
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
     String ipAddress = IPAddress2String(WiFi.localIP());
+
+    #ifdef screenActive //Stefan
     oled.clearDisplay();
     oled.setTextXY(0, 0);
     oled.putString("WIFI Connected");
     oled.setTextXY(1, 0);
     oled.putString(ipAddress);
+    #else
+    Serial.println("WIFI Connected");  //Stefan
+    Serial.println(ipAddress);  //Stefan
+    #endif
+
     server.begin();
   }
 }
 
 static void ScanNetwork() {
-  oled.clearDisplay();
+
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
+  
+  #ifdef screenActive  //Stefan
+  oled.clearDisplay();
   oled.setTextXY(0, 0);
   oled.putString("Hotspot Lost");
+  #else
+  Serial.println("Hotspot Lost");
+  #endif
+  
   if (enableSenderA) {
+    #ifdef screenActive //Stefan
     oled.setTextXY(3, 0);
     oled.putString("Sender ON ");
+    #else
+    Serial.println("Sender ON");
+    #endif  
   } else {
+    #ifdef screenActive
     oled.setTextXY(3, 0);
     oled.putString("Sender OFF");
+    #else
+    Serial.println("Sender OFF");
+    #endif
   }
-
+  #ifdef screenActive
   oled.setTextXY(4, 0);
   oled.putString("worktime= ");
   oled.setTextXY(4, 10);
   oled.putString("     ");
   oled.setTextXY(4, 10);
   oled.putFloat(workTimeMins, 0);
+  #else
+  Serial.print("Worktime = ");
+  Serial.println(workTimeMins);
+  #endif
 
   if (USE_PERI_CURRENT) {
-    busvoltage1 = INAPERI.readBusVoltage();
-    PeriCurrent = INAPERI.readShuntCurrent();
+
+    //Stefan
+    //busvoltage1 = INAPERI.readBusVoltage();
+    //PeriCurrent = INAPERI.readShuntCurrent();
+    busvoltage1 = INAPERI.getBusVoltage_V();
+    PeriCurrent = INAPERI.getCurrent_mA();
+    DcDcOutVoltage = INAPERI.getBusVoltage_V();
+
     PeriCurrent = PeriCurrent - 100.0;                         //the DC/DC,ESP32,LN298N can drain up to 300 ma when scanning network
     if (PeriCurrent <= 5) PeriCurrent = 0;                     //
     PeriCurrent = PeriCurrent * busvoltage1 / DcDcOutVoltage;  // it's 3.2666 = 29.4/9.0 the power is read before the DC/DC converter so the current change according : 29.4V is the Power supply 9.0V is the DC/DC output voltage (Change according your setting)
-    
-    Serial.print("Pericurr ");
-    Serial.println(PeriCurrent);
-  
+
+    #ifdef screenActive //Stefan
     oled.setTextXY(5, 0);
     oled.putString("Pericurr ");
     oled.setTextXY(5, 10);
     oled.putString("     ");
     oled.setTextXY(5, 10);
     oled.putFloat(PeriCurrent, 0);
+    #else
+    Serial.print("Pericurr = ");
+    Serial.println(PeriCurrent);
+    #endif    
   }
 
-
   if (USE_STATION) {
-    ChargeCurrent = INACHARGE.readShuntCurrent();
+ 
+    //Stefan 
+    //ChargeCurrent = INACHARGE.readShuntCurrent();
+    ChargeCurrent = INACHARGE.getCurrent_mA();
+    
     if (ChargeCurrent <= 5) ChargeCurrent = 0;
-
-    Serial.print("Charcurr ");
-    Serial.println(ChargeCurrent);
-
+   
+    #ifdef screenActive //Stefan
     oled.setTextXY(6, 0);
     oled.putString("Charcurr ");
     oled.setTextXY(6, 10);
     oled.putString("     ");
     oled.setTextXY(6, 10);
     oled.putFloat(ChargeCurrent, 0);
-  }
+    #else
+    Serial.print("Chargecurr = ");
+    Serial.println(ChargeCurrent);
+    #endif
 
+  }
   delay(5000);  // wait until all is disconnect
   int n = WiFi.scanNetworks();
   if (n == -1) {
+    
+    #ifdef screenActive //Stefan
     oled.setTextXY(0, 0);
     oled.putString("Scan running...");
     oled.setTextXY(1, 0);
     oled.putString("Need Reset? ");
     oled.setTextXY(2, 0);
     oled.putString("If sender is OFF");
+    #else
+    Serial.println("Scan running...");
+    Serial.println("Need reset?");
+    Serial.println("If sender is OFF");
+    #endif
+        
     delay(5000);
     if ((!enableSenderA) && (!enableSenderB)) ESP.restart();  // do not reset if sender is ON
   }
   if (n == -2)
   //bug in esp32 if wifi is lost many time the esp32 fail to autoreconnect,maybe solve in other firmware ???????
   {
+    
+    #ifdef screenActive //Stefan
     oled.setTextXY(0, 0);
     oled.putString("Scan Fail.");
     oled.setTextXY(1, 0);
     oled.putString("Need Reset? ");
     oled.setTextXY(2, 0);
     oled.putString("If sender is Off");
+    #else
+    Serial.println("Scan fail.");
+    Serial.println("Need reset?");
+    Serial.println("If sender is OFF");
+    #endif
+        
     delay(5000);
     if ((!enableSenderA) && (!enableSenderB)) ESP.restart();
   }
   if (n == 0) {
+
+    #ifdef screenActive //Stefan
     oled.setTextXY(0, 0);
     oled.putString("No networks.");
+    #else
+    Serial.println("No networks.");
+    #endif
+
   }
   if (n > 0) {
-    Serial.print("find ");
+    Serial.print("Find ");
     Serial.println(n);
+
+
+
+    #ifdef screenActive //Stefan
     oled.setTextXY(0, 0);
     oled.putString("Find ");
+    #endif
+    
     for (int i = 0; i < n; ++i) {
       // Print SSID for each network found
       char currentSSID[64];
       WiFi.SSID(i).toCharArray(currentSSID, 64);
-      Serial.print("find Wifi : ");
+      Serial.print("Find Wifi : ");
       Serial.println(currentSSID);
+
+      #ifdef screenActive //Stefan
       oled.setTextXY(0, 5);
       oled.putString(currentSSID);
+      #endif
+
+
       delay(1500);
       if (String(currentSSID) == ssid) {
         connection();
@@ -376,7 +457,6 @@ void setup() {
   pinMode(pinIN3, OUTPUT);
   pinMode(pinIN4, OUTPUT);
   pinMode(pinEnableB, OUTPUT);
-
 //  pinMode(pinPushButton, INPUT);
 //  pinMode(pinRainFlow, INPUT);
 
@@ -397,27 +477,43 @@ void setup() {
   // Set WiFi to station mode and disconnect from an AP if it was previously connected
   if (WiFi.config(staticIP, gateway, subnet, dns, dns) == false) {
     Serial.println("WIFI Configuration failed.");
-  }
+  }  
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   delay(100);
   //------------------------  SCREEN parts  ----------------------------------------
+
+
+
+  #ifdef screenActive //Stefan
   oled.init();  // Initialze SSD1306 OLED display
-  delay(500);
-  oled.clearDisplay();  // Clear screen
+  delay(500);  
+  oled.clearDisplay();  // Clear screen  
   delay(500);
   oled.setTextXY(0, 0);  // Set cursor position, start of line 0
-  oled.putString("TEENSYMOWER");
+  oled.putString("TEENSYMOWER");  
   oled.setTextXY(1, 0);  // Set cursor position, start of line 1
   oled.putString("BB SENDER");
   oled.setTextXY(2, 0);  // Set cursor position, start of line 2
   oled.putString(VER);
   oled.setTextXY(3, 0);  // Set cursor position, line 2 10th character
-  //oled.putString("2 LOOPS");
+  oled.putString("2 LOOPS");
+  #else
+  Serial.println("TEENSYMOWER");
+  Serial.println("BB SENDER");
+  Serial.println(VER);
+  Serial.println("2 LOOPS");
+  #endif
+
   //------------------------  current sensor parts  ----------------------------------------
   Serial.println("Measuring voltage and current using INA226 ...");
-  INAPERI.begin(0x40);
-  INACHARGE.begin(0x44);
+
+  //Stefan
+  //INAPERI.begin(0x41);
+  //INACHARGE.begin(0x44);
+  INAPERI.init();
+  INACHARGE.init();
+
 //  Serial.print("Manufactures ID=0x");
 //  int MID;
 //  MID = ina3221.getManufID();
@@ -426,37 +522,67 @@ void setup() {
 }
 // SETUP END
 
-
 // LOOP BEGIN
 void loop() {
   if (millis() >= nextTimeControl) {
     nextTimeControl = millis() + 1000;  //after debug can set this to 10 secondes
     //StartButtonProcess = false;
+
+
+
+    #ifdef screenActive //Stefan
     oled.setTextXY(4, 0);
     oled.putString("worktime = ");
     oled.setTextXY(4, 10);
     oled.putString("     ");
     oled.setTextXY(4, 10);
     oled.putFloat(workTimeMins, 0);
+    #else    
+    Serial.print("Worktime = ");
+    Serial.println(workTimeMins);
+    #endif
+    
+    
     if (USE_PERI_CURRENT) {
-      busvoltage1 = INAPERI.readBusVoltage();
-      PeriCurrent = INAPERI.readShuntCurrent();
+
+
+
+      //Stefan
+      //busvoltage1 = INAPERI.readBusVoltage();
+      //PeriCurrent = INAPERI.readShuntCurrent();
+      busvoltage1 = INAPERI.getBusVoltage_V();
+      PeriCurrent = INAPERI.getCurrent_mA();
+    
+
+
       PeriCurrent = PeriCurrent - 100.0;                         //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
       if (PeriCurrent <= 5) PeriCurrent = 0;                     //
       PeriCurrent = PeriCurrent * busvoltage1 / DcDcOutVoltage;  // it's 3.2666 = 29.4/9.0 the power is read before the DC/DC converter so the current change according : 29.4V is the Power supply 9.0V is the DC/DC output voltage (Change according your setting)
 
 
       if ((enableSenderA) && (PeriCurrent < PERI_CURRENT_MIN)) {
+
+
+
+        #ifdef screenActive //Stefan
         oled.setTextXY(5, 0);
-        Serial.println("  Wire is Cut  ");
         oled.putString("  Wire is Cut  ");
+        #else
+        Serial.println("WIRE IS CUT!!!");
+        #endif
+        
       } else {
+        #ifdef screenActive
         oled.setTextXY(5, 0);
         oled.putString("Pericurr ");
         oled.setTextXY(5, 10);
         oled.putString("     ");
         oled.setTextXY(5, 10);
         oled.putFloat(PeriCurrent, 0);
+        #else
+        Serial.print("Pericurr ");
+        Serial.println(PeriCurrent);
+        #endif
       }
     }
 
@@ -482,26 +608,44 @@ void loop() {
   if (millis() >= nextTimeSec) {
     nextTimeSec = millis() + 1000;
 
+    #ifdef screenActive //Stefan
     oled.setTextXY(7, 0);
     oled.putString("                ");
     oled.setTextXY(7, 0);
     oled.putString("Area : ");
     oled.setTextXY(7, 7);
     oled.putFloat(sigCodeInUse, 0);
-
+    #else
+    Serial.print("Area : ");  //Stefan
+    Serial.println(sigCodeInUse);  //Stefan
+    #endif
 
     if (USE_STATION) {
-      busvoltage2 = INACHARGE.readBusVoltage();
-      shuntvoltage2 = INACHARGE.readShuntVoltage();
-      ChargeCurrent = INACHARGE.readShuntCurrent();
+
+      //busvoltage2 = INACHARGE.readBusVoltage();
+      //shuntvoltage2 = INACHARGE.readShuntVoltage();
+      //ChargeCurrent = INACHARGE.readShuntCurrent();
+      busvoltage2 = INACHARGE.getBusVoltage_V();
+      shuntvoltage2 = INACHARGE.getShuntVoltage_mV();
+      ChargeCurrent = INACHARGE.getCurrent_mA();
+
+
+
       if (ChargeCurrent <= 5) ChargeCurrent = 0;
       loadvoltage2 = busvoltage2 + (shuntvoltage2 / 1000);
+
+      #ifdef screenActive //Stefan
       oled.setTextXY(6, 0);
       oled.putString("Charcurr ");
       oled.setTextXY(6, 10);
       oled.putString("     ");
       oled.setTextXY(6, 10);
       oled.putFloat(ChargeCurrent, 0);
+      #else
+      Serial.print("Charcurr ");
+      Serial.println(ChargeCurrent);
+      #endif
+
 
       if (ChargeCurrent > 200) {  //mower is into the station ,in my test 410 ma are drained so possible to stop sender
         enableSenderA = false;
@@ -542,20 +686,40 @@ void loop() {
     }
 
     if ((enableSenderA) || (enableSenderB)) {
+
+      #ifdef screenActive //Stefan
       oled.setTextXY(2, 0);
       oled.putString("Sender ON :     ");
+      #else
+      Serial.print("Sender ON : ");
+      #endif
+
       if (enableSenderA) {
+        #ifdef screenActive //Stefan
         oled.setTextXY(2, 13);
         oled.putString("A");
+        #else
+        Serial.print("A");
+        #endif
       }
       if (enableSenderB) {
+        #ifdef screenActive //Stefan
         oled.setTextXY(2, 15);
         oled.putString("B");
+        #else
+        Serial.print("B");  //Stefan
+        #endif
       }
     } else {
+      #ifdef screenActive //Stefan
       oled.setTextXY(2, 0);
       oled.putString("Sender OFF      ");
+      #else
+      Serial.print("Sender OFF");
+      #endif
+
     }
+    Serial.println("");
   }
 
   if (millis() >= nextTimeInfo) {
