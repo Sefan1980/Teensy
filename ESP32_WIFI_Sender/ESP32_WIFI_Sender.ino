@@ -19,9 +19,18 @@
 #include <Wire.h>
 #include <WiFi.h>
 #include "INA226_WE.h"
-#ifdef ScreenAcrobotic
-#include "ACROBOTIC_SSD1306.h"
-#endif
+#include <U8x8lib.h>
+
+//********************* Display Settings **********************************
+// Please UNCOMMENT one of the contructor lines below
+// U8x8 Contructor List 
+// The complete list is available here: https://github.com/olikraus/u8g2/wiki/u8x8setupcpp
+// Please update the pin numbers according to your setup. Use U8X8_PIN_NONE if the reset pin is not connected
+//U8X8_NULL u8x8;	// null device, a 8x8 pixel display which does nothing
+//U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 	      
+//U8X8_SSD1306_128X64_ALT0_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 	      // same as the NONAME variant, but may solve the "every 2nd line skipped" problem
+U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
+// End of constructor list
 
 //********************* WLAN Settings **********************************
 const char* ssid = "Sefan WLAN 2,4GHz";          // put here your acces point ssid
@@ -42,9 +51,15 @@ IPAddress dns(192,168,178,1);  // put here one dns (IP of your routeur)
 #define I2C_SDA 21
 #define I2C_SCL 22
 
+#define SerialOutput 1  //Show Serial Textmessages for debugging
+#define Screen 1        //Commit to deactivate
+
 INA226_WE INAPERI = INA226_WE(0x40);
 INA226_WE INACHARGE = INA226_WE(0x44);  //Bridge at A1 - VSS
 WiFiServer server(80);
+
+
+
 
 //********************* END Settings **********************************
 
@@ -114,7 +129,15 @@ void IRAM_ATTR onTimer() {  // management of the signal
       digitalWrite(pinIN2, LOW);
 
     } else {
+      #ifdef SerialOutput
       Serial.println("ERROR");
+      #endif      
+
+      #ifdef Screen
+      u8x8.clear();
+      u8x8.setCursor(5,5);
+      u8x8.print("ERROR");      
+      #endif
       //digitalWrite(pinEnableA, LOW);
     }
     step++;
@@ -133,7 +156,15 @@ void IRAM_ATTR onTimer() {  // management of the signal
       digitalWrite(pinIN4, LOW);
 
     } else {
+      #ifdef SerialOutput
       Serial.println("ERROR");
+      #endif
+
+      #ifdef Screen
+      u8x8.clear();
+      u8x8.setCursor(5,5);
+      u8x8.print("ERROR");      
+      #endif
       //digitalWrite(pinEnableA, LOW);
     }
     step++;
@@ -152,8 +183,19 @@ void changeArea(byte areaInMowing) {  // not finish to dev
   step = 0;
   enableSenderA = false;
   enableSenderB = false;
+  #ifdef SerialOutput
   Serial.print("Change to Area : ");
   Serial.println(areaInMowing);
+  #endif
+
+  #ifdef Screen
+  u8x8.clear();
+  u8x8.setCursor(0,0);  
+  u8x8.print("Change to Area:");
+  u8x8.setCursor(0,1);
+  u8x8.println(areaInMowing);
+  delay(1000);
+  #endif
   for (int uu = 0; uu <= 128; uu++) {  //clear the area
     sigcode_norm[uu] = 0;
   }
@@ -190,57 +232,80 @@ void changeArea(byte areaInMowing) {  // not finish to dev
       }
       break;
   }
-
+  #ifdef SerialOutput
   Serial.print("New sigcode in use  : ");
   Serial.println(sigCodeInUse);
+  #endif
 
+  #ifdef Screen
+  u8x8.setCursor(0,2);
+  u8x8.print("sigCode in use:");
+  u8x8.print(sigCodeInUse);
+  #endif
   for (int uu = 0; uu <= (sigcode_size - 1); uu++) {
+    #ifdef SerialOutput
     Serial.print(sigcode_norm[uu]);
     Serial.print(",");
+    #endif
+  
+
   }
+  #ifdef SerialOutput
   Serial.println();
   Serial.print("New sigcode size  : ");
   Serial.println(sigcode_size);
+  #endif
+  
+  #ifdef Screen
+  u8x8.setCursor(0,3);
+  u8x8.print("sigcode size:");
+  u8x8.print(sigcode_size);
+  delay(2000);
+  #endif
 }
 
 void connection() {
+  #ifdef SerialOutput
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
+  #endif
   WiFi.begin(ssid, password);
   for (int i = 0; i < 60; i++) {
     if (WiFi.status() != WL_CONNECTED) {
 
-     #ifdef ScreenAcrobotic
-       oled.clearDisplay();
-       oled.setTextXY(0, 0);
-       oled.putString("Try connecting");
-     #else
-     Serial.println("Try connecting");
-     #endif
-
+      #ifdef SerialOutput
+      Serial.println("Try connecting");
+      #endif
+      
+      #ifdef Screen
+      u8x8.clear();
+      u8x8.setCursor(0,3);
+      u8x8.print("CONNECTING");
+      #endif      
       delay(250);
     }
   }
 
   if (WiFi.status() == WL_CONNECTED) {
+    #ifdef SerialOutput
     Serial.println("WiFi connected.");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
-    String ipAddress = IPAddress2String(WiFi.localIP());
-
-    #ifdef ScreenAcrobotic
-    oled.clearDisplay();
-    oled.setTextXY(0, 0);
-    oled.putString("WIFI Connected");
-    oled.setTextXY(1, 0);
-    oled.putString(ipAddress);
-    #else
-    Serial.println("WIFI Connected");
-    Serial.println(ipAddress);
+    #endif    
+    
+    #ifdef Screen
+    u8x8.clear();
+    u8x8.setCursor(0,0);
+    u8x8.print("WiFi Connected");
+    u8x8.setCursor(0,2);
+    u8x8.print("IP address:");
+    u8x8.setCursor(0,4);
+    u8x8.print(WiFi.localIP());
+    delay(2000);
     #endif
-
-    server.begin();
+   
+     server.begin();
   }
 }
 
@@ -249,37 +314,42 @@ static void ScanNetwork() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   
-  #ifdef ScreenAcrobotic
-  oled.clearDisplay();
-  oled.setTextXY(0, 0);
-  oled.putString("Hotspot Lost");
-  #else
+  #ifdef Screen
+  u8x8.clear();
+  u8x8.setCursor(0, 0);
+  u8x8.print("Hotspot Lost");
+  #endif
+
+  #ifdef SerialOutput
   Serial.println("Hotspot Lost");
   #endif
   
   if (enableSenderA) {
-    #ifdef ScreenAcrobotic
-    oled.setTextXY(3, 0);
-    oled.putString("Sender ON ");
-    #else
+    #ifdef Screen
+    u8x8.setCursor(0, 3);
+    u8x8.print("Sender ON ");
+    #endif
+    #ifdef SerialOutput
     Serial.println("Sender ON");
     #endif  
   } else {
-    #ifdef ScreenAcrobotic
-    oled.setTextXY(3, 0);
-    oled.putString("Sender OFF");
-    #else
+    #ifdef Screen
+    u8x8.setCursor(0, 3);
+    u8x8.print("Sender OFF");
+    #endif
+    #ifdef SerialOutput
     Serial.println("Sender OFF");
     #endif
   }
-  #ifdef ScreenAcrobotic
-  oled.setTextXY(4, 0);
-  oled.putString("worktime= ");
-  oled.setTextXY(4, 10);
-  oled.putString("     ");
-  oled.setTextXY(4, 10);
-  oled.putFloat(workTimeMins, 0);
-  #else
+  #ifdef Screen
+  u8x8.setCursor(0, 4);
+  u8x8.print("worktime= ");
+  u8x8.setCursor(10, 4);
+  u8x8.print("     ");
+  u8x8.setCursor(10, 4);
+  u8x8.print(workTimeMins, 0);
+  #endif
+  #ifdef SerialOutput
   Serial.print("Worktime = ");
   Serial.println(workTimeMins);
   #endif
@@ -293,14 +363,15 @@ static void ScanNetwork() {
     if (PeriCurrent <= 5) PeriCurrent = 0;                     //
     PeriCurrent = PeriCurrent * busvoltage1 / DcDcOutVoltage;  // it's 3.2666 = 29.4/9.0 the power is read before the DC/DC converter so the current change according : 29.4V is the Power supply 9.0V is the DC/DC output voltage (Change according your setting)
 
-    #ifdef ScreenAcrobotic
-    oled.setTextXY(5, 0);
-    oled.putString("Pericurr ");
-    oled.setTextXY(5, 10);
-    oled.putString("     ");
-    oled.setTextXY(5, 10);
-    oled.putFloat(PeriCurrent, 0);
-    #else
+    #ifdef Screen
+    u8x8.setCursor(0, 5);
+    u8x8.print("Pericurr ");
+    u8x8.setCursor(10, 5);
+    u8x8.print("     ");
+    u8x8.setCursor(10, 5);
+    u8x8.print(PeriCurrent);
+    #endif
+    #ifdef SerialOutput
     Serial.print("Pericurr = ");
     Serial.println(PeriCurrent);
     #endif    
@@ -312,14 +383,15 @@ static void ScanNetwork() {
 
     if (ChargeCurrent <= 5) ChargeCurrent = 0;
 
-    #ifdef ScreenAcrobotic //Stefan
-    oled.setTextXY(6, 0);
-    oled.putString("Charcurr ");
-    oled.setTextXY(6, 10);
-    oled.putString("     ");
-    oled.setTextXY(6, 10);
-    oled.putFloat(ChargeCurrent, 0);
-    #else
+    #ifdef Screen //Stefan
+    u8x8.setCursor(0, 6);
+    u8x8.print("Charcurr ");
+    u8x8.setCursor(10, 6);
+    u8x8.print("     ");
+    u8x8.setCursor(10, 6);
+    u8x8.print(ChargeCurrent);
+    #endif
+    #ifdef SerialOutput
     Serial.print("Chargecurr = ");
     Serial.println(ChargeCurrent);
     #endif
@@ -328,14 +400,15 @@ static void ScanNetwork() {
   int n = WiFi.scanNetworks();
   if (n == -1) {
     
-    #ifdef ScreenAcrobotic
-    oled.setTextXY(0, 0);
-    oled.putString("Scan running...");
-    oled.setTextXY(1, 0);
-    oled.putString("Need Reset? ");
-    oled.setTextXY(2, 0);
-    oled.putString("If sender is OFF");
-    #else
+    #ifdef Screen
+    u8x8.setCursor(0, 0);
+    u8x8.print("Scan running...");
+    u8x8.setCursor(1, 0);
+    u8x8.print("Need Reset? ");
+    u8x8.setCursor(2, 0);
+    u8x8.print("If sender is OFF");
+    #endif
+    #ifdef SerialOutput
     Serial.println("Scan running...");
     Serial.println("Need reset?");
     Serial.println("If sender is OFF");
@@ -348,14 +421,15 @@ static void ScanNetwork() {
   //bug in esp32 if wifi is lost many time the esp32 fail to autoreconnect,maybe solve in other firmware ???????
   {
     
-    #ifdef ScreenAcrobotic
-    oled.setTextXY(0, 0);
-    oled.putString("Scan Fail.");
-    oled.setTextXY(1, 0);
-    oled.putString("Need Reset? ");
-    oled.setTextXY(2, 0);
-    oled.putString("If sender is Off");
-    #else
+    #ifdef Screen
+    u8x8.setCursor(0, 0);
+    u8x8.print("Scan Fail.");
+    u8x8.setCursor(1, 0);
+    u8x8.print("Need Reset? ");
+    u8x8.setCursor(2, 0);
+    u8x8.print("If sender is Off");
+    #endif
+    #ifdef SerialOutput
     Serial.println("Scan fail.");
     Serial.println("Need reset?");
     Serial.println("If sender is OFF");
@@ -366,33 +440,40 @@ static void ScanNetwork() {
   }
   if (n == 0) {
 
-    #ifdef ScreenAcrobotic
-    oled.setTextXY(0, 0);
-    oled.putString("No networks.");
-    #else
+    #ifdef Screen
+    u8x8.setCursor(0, 0);
+    u8x8.print("No networks.");
+    #endif
+    #ifdef SerialOutput
     Serial.println("No networks.");
     #endif
   }
 
   if (n > 0) {
+    
+    #ifdef SerialOutput
     Serial.print("Find ");
     Serial.println(n);
+    #endif
 
-    #ifdef ScreenAcrobotic
-    oled.setTextXY(0, 0);
-    oled.putString("Find ");
+    #ifdef Screen
+    u8x8.setCursor(0, 0);
+    u8x8.print("Find ");
     #endif
     
     for (int i = 0; i < n; ++i) {
       // Print SSID for each network found
       char currentSSID[64];
       WiFi.SSID(i).toCharArray(currentSSID, 64);
+      
+      #ifdef SerialOutput
       Serial.print("Find Wifi : ");
       Serial.println(currentSSID);
-
-      #ifdef ScreenAcrobotic
-      oled.setTextXY(0, 5);
-      oled.putString(currentSSID);
+      #endif      
+      
+      #ifdef Screen
+      u8x8.setCursor(0, 5);
+      u8x8.print(currentSSID);
       #endif
 
       delay(1500);
@@ -409,6 +490,19 @@ void setup() {
   //------------------------  Signal parts  ----------------------------------------
   Serial.begin(115200);
   Wire.begin();
+
+  u8x8.begin();
+  //u8x8.setFont(u8x8_font_amstrad_cpc_extended_f);    
+  //u8x8.setFont(u8x8_font_px437wyse700b_2x2_r);
+  //u8x8.setFont(u8x8_font_chroma48medium8_r);  
+  //u8x8.setFont(u8x8_font_inb33_3x6_n);
+  //u8x8.setFont(u8x8_font_5x7_f);
+  u8x8.setFont(u8x8_font_5x8_f);
+  //u8x8.setFont(u8x8_font_artosserif8_r);
+  //u8x8.setFont(u8x8_font_victoriamedium8_r);
+  //u8x8.setFont(u8x8_font_pressstart2p_f);
+  u8x8.clear();
+
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, 104, true);
@@ -420,11 +514,21 @@ void setup() {
   pinMode(pinIN4, OUTPUT);
   pinMode(pinEnableB, OUTPUT);
 
+  #ifdef SerialOutput
   Serial.println("START");
   Serial.print("Teensymower Sender ");
   Serial.println(VER);
-  Serial.print("USE_PERI_CURRENT=");
+  Serial.print(" USE_PERI_CURRENT=");
   Serial.println(USE_PERI_CURRENT);
+  #endif
+  #ifdef Screen
+  u8x8.println("START");
+  u8x8.println("Teensy Sender");
+  u8x8.print("");u8x8.println(VER);
+  u8x8.print("USE_PERI_CURR=");
+  u8x8.println(USE_PERI_CURRENT);
+  delay(2000);
+  #endif
 
   changeArea(sigCodeInUse);
   if (enableSenderA) {
@@ -437,27 +541,28 @@ void setup() {
   //------------------------  WIFI parts  ----------------------------------------
   // Set WiFi to station mode and disconnect from an AP if it was previously connected
   if (WiFi.config(staticIP, gateway, subnet, dns, dns) == false) {
+    
+    #ifdef SerialOutput
     Serial.println("WIFI Configuration failed.");
+    #endif
   }  
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   delay(100);
 
   //------------------------  SCREEN parts  ----------------------------------------
-  #ifdef ScreenAcrobotic
-  oled.init();  // Initialze SSD1306 OLED display
-  delay(500);  
-  oled.clearDisplay();  // Clear screen  
-  delay(500);
-  oled.setTextXY(0, 0);  // Set cursor position, start of line 0
-  oled.putString("TEENSYMOWER");  
-  oled.setTextXY(1, 0);  // Set cursor position, start of line 1
-  oled.putString("BB SENDER");
-  oled.setTextXY(2, 0);  // Set cursor position, start of line 2
-  oled.putString(VER);
-  oled.setTextXY(3, 0);  // Set cursor position, line 2 10th character
-  oled.putString("2 LOOPS");
-  #else
+  #ifdef Screen
+  u8x8.clear();
+  u8x8.setCursor(0, 0);  // Set cursor position, start of line 0
+  u8x8.print("TEENSYMOWER");  
+  u8x8.setCursor(0, 1);  // Set cursor position, start of line 1
+  u8x8.print("BB SENDER");
+  u8x8.setCursor(0, 2);  // Set cursor position, start of line 2
+  u8x8.print(VER);
+  u8x8.setCursor(0, 3);  // Set cursor position, line 2 10th character
+  u8x8.print("2 LOOPS");
+  #endif
+  #ifdef SerialOutput
   Serial.println("TEENSYMOWER");
   Serial.println("BB SENDER");
   Serial.println(VER);
@@ -465,7 +570,10 @@ void setup() {
   #endif
 
   //------------------------  current sensor parts  ----------------------------------------
+  #ifdef SerialOutput
   Serial.println("Measuring voltage and current using INA226 ...");
+  #endif
+  
   INAPERI.init();
   INACHARGE.init();
   delay(5000);
@@ -473,18 +581,20 @@ void setup() {
 // SETUP END
 
 // LOOP BEGIN
+
 void loop() {
   if (millis() >= nextTimeControl) {
     nextTimeControl = millis() + 1000;  //after debug can set this to 10 secondes
 
-    #ifdef ScreenAcrobotic
-    oled.setTextXY(4, 0);
-    oled.putString("worktime = ");
-    oled.setTextXY(4, 10);
-    oled.putString("     ");
-    oled.setTextXY(4, 10);
-    oled.putFloat(workTimeMins, 0);
-    #else    
+    #ifdef Screen
+    u8x8.setCursor(0, 4);
+    u8x8.print("worktime = ");
+    u8x8.setCursor(10, 4);
+    u8x8.print("     ");
+    u8x8.setCursor(10, 4);
+    u8x8.print(workTimeMins);
+    #endif
+    #ifdef SerialOutput    
     Serial.print("Worktime = ");
     Serial.println(workTimeMins);
     #endif
@@ -497,22 +607,26 @@ void loop() {
       PeriCurrent = PeriCurrent * busvoltage1 / DcDcOutVoltage;  // it's 3.2666 = 29.4/9.0 the power is read before the DC/DC converter so the current change according : 29.4V is the Power supply 9.0V is the DC/DC output voltage (Change according your setting)
 
       if ((enableSenderA) && (PeriCurrent < PERI_CURRENT_MIN)) {
-        #ifdef ScreenAcrobotic
-        oled.setTextXY(5, 0);
-        oled.putString("  Wire is Cut  ");
-        #else
+        #ifdef Screen
+        u8x8.setCursor(0, 5);
+        u8x8.inverse();
+        u8x8.print("  Wire is Cut   ");
+        u8x8.noInverse();
+        #endif
+        #ifdef SerialOutput
         Serial.println("WIRE IS CUT!!!");
         #endif
         
       } else {
-        #ifdef ScreenAcrobotic
-        oled.setTextXY(5, 0);
-        oled.putString("Pericurr ");
-        oled.setTextXY(5, 10);
-        oled.putString("     ");
-        oled.setTextXY(5, 10);
-        oled.putFloat(PeriCurrent, 0);
-        #else
+        #ifdef Screen
+        u8x8.setCursor(0, 5);
+        u8x8.print("Pericurr ");
+        u8x8.setCursor(8, 5);
+        u8x8.print("       ");
+        u8x8.setCursor(10, 5);
+        u8x8.print(PeriCurrent);
+        #endif
+        #ifdef SerialOutput
         Serial.print("Pericurr ");
         Serial.println(PeriCurrent);
         #endif
@@ -541,14 +655,15 @@ void loop() {
   if (millis() >= nextTimeSec) {
     nextTimeSec = millis() + 1000;
 
-    #ifdef ScreenAcrobotic
-    oled.setTextXY(7, 0);
-    oled.putString("                ");
-    oled.setTextXY(7, 0);
-    oled.putString("Area : ");
-    oled.setTextXY(7, 7);
-    oled.putFloat(sigCodeInUse, 0);
-    #else
+    #ifdef Screen
+    u8x8.setCursor(0, 7);
+    u8x8.print("                ");
+    u8x8.setCursor(0, 7);
+    u8x8.print("Area : ");
+    u8x8.setCursor(7, 7);
+    u8x8.print(sigCodeInUse);
+    #endif
+    #ifdef SerialOutput
     Serial.print("Area : ");
     Serial.println(sigCodeInUse);
     #endif
@@ -562,14 +677,15 @@ void loop() {
       if (ChargeCurrent <= 5) ChargeCurrent = 0;
       loadvoltage2 = busvoltage2 + (shuntvoltage2 / 1000);
 
-      #ifdef ScreenAcrobotic
-      oled.setTextXY(6, 0);
-      oled.putString("Charcurr ");
-      oled.setTextXY(6, 10);
-      oled.putString("     ");
-      oled.setTextXY(6, 10);
-      oled.putFloat(ChargeCurrent, 0);
-      #else
+      #ifdef Screen
+      u8x8.setCursor(0, 6);
+      u8x8.print("Charcurr ");
+      u8x8.setCursor(10, 6);
+      u8x8.print("     ");
+      u8x8.setCursor(10, 6);
+      u8x8.print(ChargeCurrent);
+      #endif
+      #ifdef SerialOutput
       Serial.print("Charcurr ");
       Serial.println(ChargeCurrent);
       #endif
@@ -614,39 +730,49 @@ void loop() {
 
     if ((enableSenderA) || (enableSenderB)) {
 
-      #ifdef ScreenAcrobotic
-      oled.setTextXY(2, 0);
-      oled.putString("Sender ON :     ");
-      #else
+      #ifdef Screen
+      u8x8.setCursor(0,0);
+      u8x8.inverse();
+      u8x8.print("  Teensy Sender  ");
+      u8x8.noInverse();
+      u8x8.setCursor(0, 2);
+      u8x8.print("Sender ON :     ");
+      #endif
+      #ifdef SerialOutput
       Serial.print("Sender ON : ");
       #endif
 
       if (enableSenderA) {
-        #ifdef ScreenAcrobotic
-        oled.setTextXY(2, 13);
-        oled.putString("A");
-        #else
+        #ifdef Screen
+        u8x8.setCursor(13, 2);
+        u8x8.print("A");
+        #endif
+        #ifdef SerialOutput
         Serial.print("A");
         #endif
       }
       if (enableSenderB) {
-        #ifdef ScreenAcrobotic
-        oled.setTextXY(2, 15);
-        oled.putString("B");
-        #else
+        #ifdef Screen
+        u8x8.setCursor(15, 2);
+        u8x8.print("B");
+        #endif
+        #ifdef SerialOutput
         Serial.print("B");
         #endif
       }
     } else {
-      #ifdef ScreenAcrobotic
-      oled.setTextXY(2, 0);
-      oled.putString("Sender OFF      ");
-      #else
+      #ifdef Screen
+      u8x8.setCursor(2, 0);
+      u8x8.print("Sender OFF      ");
+      #endif
+      #ifdef SerialOutput
       Serial.print("Sender OFF");
       #endif
 
     }
+    #ifdef SerialOutput
     Serial.println("");
+    #endif
   }
 
   if (millis() >= nextTimeInfo) {
@@ -660,10 +786,11 @@ void loop() {
     // Read the first line of the request
     String req = client.readStringUntil('\r');
     if (req == "") return;
+    #ifdef SerialOutput
     Serial.print("Client say  ");
     Serial.println(req);
     Serial.println("------------------------ - ");
-  
+    #endif
     // Match the request
     if (req.indexOf("GET /A0") != -1) {
       enableSenderA = false;
@@ -675,7 +802,9 @@ void loop() {
       sResponse = "SENDER A IS OFF";
   
       // Send the response to the client
+      #ifdef SerialOutput
       Serial.println(sResponse);
+      #endif
       client.print(sResponse);
       client.flush();
     }
@@ -689,7 +818,9 @@ void loop() {
       sResponse = "SENDER B IS OFF";
   
       // Send the response to the client
+      #ifdef SerialOutput
       Serial.println(sResponse);
+      #endif
       client.print(sResponse);
       client.flush();
     }
@@ -705,7 +836,9 @@ void loop() {
       sResponse = "SENDER A IS ON";
  
       // Send the response to the client
+      #ifdef SerialOutput
       Serial.println(sResponse);
+      #endif
       client.print(sResponse);
       client.flush();
     }
@@ -721,7 +854,9 @@ void loop() {
       sResponse = "SENDER B IS ON";
  
       // Send the response to the client
+      #ifdef SerialOutput
       Serial.println(sResponse);
+      #endif
       client.print(sResponse);
       client.flush();
     }
@@ -745,7 +880,9 @@ void loop() {
       sResponse += " sender B : ";
       sResponse += enableSenderB;
 
+      #ifdef SerialOutput
       Serial.println(sResponse);
+      #endif
       client.print(sResponse);
       client.flush();
     }
@@ -759,7 +896,9 @@ void loop() {
       sResponse = "NOW Send Signal 0";
  
       // Send the response to the client
+      #ifdef SerialOutput
       Serial.println(sResponse);
+      #endif
       client.print(sResponse);
       client.flush();
     }
@@ -772,7 +911,9 @@ void loop() {
       sResponse = "NOW Send Signal 1";
  
       // Send the response to the client
+      #ifdef SerialOutput
       Serial.println(sResponse);
+      #endif
       client.print(sResponse);
       client.flush();
     }
@@ -786,7 +927,9 @@ void loop() {
       sResponse = "NOW Send Signal 2";
  
       // Send the response to the client
+      #ifdef SerialOutput
       Serial.println(sResponse);
+      #endif
       client.print(sResponse);
       client.flush();
     }
@@ -800,7 +943,9 @@ void loop() {
       sResponse = "NOW Send Signal 3";
  
       // Send the response to the client
+      #ifdef SerialOutput
       Serial.println(sResponse);
+      #endif
       client.print(sResponse);
       client.flush();
     }
@@ -814,7 +959,9 @@ void loop() {
       sResponse = "NOW Send Signal 4";
  
       // Send the response to the client
+      #ifdef SerialOutput
       Serial.println(sResponse);
+      #endif
       client.print(sResponse);
       client.flush();
     }
@@ -827,7 +974,9 @@ void loop() {
       sResponse = "NOW 104 microsecond signal duration";
  
       // Send the response to the client
+      #ifdef SerialOutput
       Serial.println(sResponse);
+      #endif
       client.print(sResponse);
       client.flush();
     }
@@ -841,7 +990,9 @@ void loop() {
       sResponse = "NOW 50 microsecond signal duration";
  
       // Send the response to the client
+      #ifdef SerialOutput
       Serial.println(sResponse);
+      #endif
       client.print(sResponse);
       client.flush();
     }
