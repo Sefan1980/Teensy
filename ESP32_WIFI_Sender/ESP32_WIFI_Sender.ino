@@ -19,7 +19,7 @@
 #include <Wire.h>
 #include <WiFi.h>
 #include "INA226_WE.h"
-#include <U8x8lib.h>
+#include <U8x8lib.h>  //Please install the library U8g2 from Oliver Kraus
 
 //********************* Display Settings **********************************
 // Please UNCOMMENT one of the contructor lines below
