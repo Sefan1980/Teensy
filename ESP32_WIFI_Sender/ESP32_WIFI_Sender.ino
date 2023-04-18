@@ -17,17 +17,40 @@
 
 */
 
-#define OTAUpdates 1
+//********************* defines **********************************
+#define OTAUpdates 1              // OTA Updates
+#define USE_STATION 1             // a station is connected and is used to charge the mower
+#define USE_PERI_CURRENT 1        // use Feedback for perimeter current measurements? (set to '0' if not connected!)
+#define USE_BUTTON 0              // use button to start mowing or send mower to station not finish to dev
+#define USE_RAINFLOW 0            // check the amount of rain not finish to dev on 31/08/2020
+#define WORKING_TIMEOUT_MINS 300  // timeout for perimeter switch-off if robot not in station (minutes)
+#define PERI_CURRENT_MIN 200      // minimum milliAmpere for cutting wire detection
+#define AUTO_START_SIGNAL 1       // use to start sender when mower leave station
+#define I2C_SDA 21                // SDA pin
+#define I2C_SCL 22                // SCL pin
+//#define SerialOutput 1          // Show Serial Textmessages for debugging
+#define Screen 1                  // Screen or not?
+#define pinIN1 12                 // M1_IN1  ESP32 GPIO12       ( connect this pin to L298N-IN1)
+#define pinIN2 13                 // M1_IN2  ESP32 GPIO13       ( connect this pin to L298N-IN2)
+#define pinEnableA 23             // ENA    ESP32 GPIO23         (connect this pin to L298N-ENA)
+#define pinIN3 14                 // M1_IN3  ESP32 GPIO14       ( connect this pin to L298N-IN3)
+#define pinIN4 18                 // M1_IN4  ESP32 GPIO18       ( connect this pin to L298N-IN4)
+#define pinEnableB 19             // ENB    ESP32 GPIO19        (connect this pin to L298N-ENA)
+#define pinDoorOpen 34            // Not in use (Magnetic switch)
+#define pinDoorClose 35           // Not in use (Magnetic switch)
+#define pinLDR 32                 // Not in use (Light Sensor)
+#define pinGreenLED 25            // Not in use
+#define pinRedLED 26              // Not in use
+#define VER "ESP32 3.0"           // code version
 
+//********************* includes **********************************
 #include <Wire.h>
 #include <WiFi.h>
-
 #ifdef OTAUpdates
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #endif
-
 #include "INA226_WE.h"
 #include <U8x8lib.h>  //Please install the library U8g2 from Oliver Kraus
 
@@ -51,62 +74,25 @@ IPAddress subnet(255, 255, 255, 0);
 IPAddress dns(192,168,178,1);  // put here one dns (IP of your routeur)
 WiFiServer server(80);
 
-//********************* defines **********************************
-#define USE_STATION 1             // a station is connected and is used to charge the mower
-#define USE_PERI_CURRENT 1        // use Feedback for perimeter current measurements? (set to '0' if not connected!)
-#define USE_BUTTON 0              // use button to start mowing or send mower to station not finish to dev
-#define USE_RAINFLOW 0            // check the amount of rain not finish to dev on 31/08/2020
-#define WORKING_TIMEOUT_MINS 300  // timeout for perimeter switch-off if robot not in station (minutes)
-#define PERI_CURRENT_MIN 200      // minimum milliAmpere for cutting wire detection
-#define AUTO_START_SIGNAL 1       //use to start sender when mower leave station
-#define I2C_SDA 21
-#define I2C_SCL 22
-
-//#define SerialOutput 1  //Show Serial Textmessages for debugging
-#define Screen 1        //Screen or not?
+//********************* other **********************************
 bool firstStart = true;
-INA226_WE INAPERI = INA226_WE(0x40);
-INA226_WE INACHARGE = INA226_WE(0x44);  //Bridge at A1 - VSS
-
-
-
-
-//********************* END Settings **********************************
-
-byte sigCodeInUse = 1;    //1 is the original ardumower sigcode
-int sigDuration = 104;    // send the bits each 104 microsecond (Also possible 50)
+INA226_WE INAPERI = INA226_WE(0x40);                    // without bridge
+INA226_WE INACHARGE = INA226_WE(0x44);                  // Bridge at A1 - VSS
+byte sigCodeInUse = 1;                                  // 1 is the original ardumower sigcode
+int sigDuration = 104;                                  // send the bits each 104 microsecond (Also possible 50)
 int8_t sigcode_norm[128];
 int sigcode_size;
 hw_timer_t* timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
-
-#define pinIN1 12         // M1_IN1  ESP32 GPIO12       ( connect this pin to L298N-IN1)
-#define pinIN2 13         // M1_IN2  ESP32 GPIO13       ( connect this pin to L298N-IN2)
-#define pinEnableA 23     // ENA    ESP32 GPIO23         (connect this pin to L298N-ENA)
-#define pinIN3 14         // M1_IN3  ESP32 GPIO14       ( connect this pin to L298N-IN3)
-#define pinIN4 18         // M1_IN4  ESP32 GPIO18       ( connect this pin to L298N-IN4)
-#define pinEnableB 19     // ENB    ESP32 GPIO19        (connect this pin to L298N-ENA)
-
-#define pinDoorOpen 34    //Not in use (Magnetic switch)
-#define pinDoorClose 35   //Not in use (Magnetic switch)
-#define pinLDR 32         //Not in use (Light Sensor)
-#define pinGreenLED 25    //Not in use
-#define pinRedLED 26      //Not in use
-
-// code version
-#define VER "ESP32 3.0"
-
 volatile int step = 0;
 boolean enableSenderA = false;  //OFF on start to autorise the reset
 boolean enableSenderB = false;  //OFF on start to autorise the reset
-
 int timeSeconds = 0;
 unsigned long nextTimeControl = 0;
 unsigned long nextTimeInfo = 0;
 unsigned long nextTimeSec = 0;
 unsigned long nextTimeCheckButton = 0;
 int workTimeMins = 0;
-
 float PeriCurrent = 0.0;
 float ChargeCurrent = 0.0;
 float busvoltage1 = 0.0;
@@ -126,7 +112,11 @@ int8_t sigcode3[] = { 1, 1, -1, -1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1, 1, -1, 1
                       -1, 1, 1, -1, 1, 1, -1, -1, 1, -1, -1, 1, -1, 1, -1, 1, 1, -1, 1, -1, -1, 1, -1, -1, 1, 1, -1, 1, -1, -1, 1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, 1, -1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1, -1, -1, 1, 1, -1, 1, 1, -1, -1, 1 };  // 128 Zahlen from Roland
 int8_t sigcode4[] = { 1, 1, 1, -1, -1, -1 };                                                                                                                                                                                                              //extend square test code
 
-void IRAM_ATTR onTimer() {  // management of the signal
+
+//********************* Functions **********************************
+
+//********************* SIGNAL MANAGEMENT **********************************
+void IRAM_ATTR onTimer() {
   portENTER_CRITICAL_ISR(&timerMux);
   if (enableSenderA) {
 
@@ -186,7 +176,9 @@ void IRAM_ATTR onTimer() {  // management of the signal
   }
   portEXIT_CRITICAL_ISR(&timerMux);
 }
+// End of Signalmanagement
 
+//********************* CHANGE AREA **********************************
 void changeArea(byte areaInMowing) {  // not finish to dev
   step = 0;
   enableSenderA = false;
@@ -269,7 +261,9 @@ void changeArea(byte areaInMowing) {  // not finish to dev
   delay(5000);
   #endif
 }
+// END ChangeArea
 
+//********************* CONNECTION **********************************
 void connection() {
   #ifdef SerialOutput
   Serial.println();
@@ -314,7 +308,9 @@ void connection() {
      server.begin();
   }
 }
+// END Connection
 
+//********************* SCANNETWORK **********************************
 static void ScanNetwork() {
 
   WiFi.mode(WIFI_STA);
@@ -419,7 +415,9 @@ static void ScanNetwork() {
     }
   }
 }
+// END ScanNetwork
 
+//********************* STATICSCREENPARTS **********************************
 void StaticScreenParts() {
 #ifdef Screen
 //line 0: Title
@@ -446,19 +444,15 @@ void StaticScreenParts() {
   u8x8.print("Area:");
 #endif  
 }
+// END StaticScreenParts
 
-
-
-// SETUP BEGIN
+//********************* SETUP **********************************
 void setup() {
-  //------------------------  Signal parts  ----------------------------------------
   Serial.begin(115200);
   Wire.begin();
-
   u8x8.begin();
   u8x8.setFont(u8x8_font_5x8_f);
   u8x8.clear();
-
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, 104, true);
@@ -565,12 +559,9 @@ void setup() {
   ArduinoOTA.begin();
   #endif
 }
-// SETUP END
+// END SETUP
 
-
-
-// LOOP BEGIN
-
+//********************* LOOP **********************************
 void loop() {
 
 #ifdef OTAUpdates
@@ -989,3 +980,4 @@ void loop() {
     }
   }
 }
+//END LOOP
