@@ -25,7 +25,7 @@ bool INA226_WE::init(){
     setAverage(AVERAGE_1);
     setConversionTime(CONV_TIME_1100);
     setMeasureMode(CONTINUOUS);
-    setCurrentRange(MA_800);
+    setCurrentRange(MA_1600);
     convAlert = false;
     limitAlert = false;
     corrFactor = 1.0;
@@ -87,7 +87,12 @@ void INA226_WE::setCurrentRange(INA226_CURRENT_RANGE range){
             currentDivider_mA = 25.0;
             pwrMultiplier_mW = 1.0;
             break;
-    }   
+        case MA_1600:
+            calVal = 640;
+            currentDivider_mA = 12.5;
+            pwrMultiplier_mW = 2.0;
+            break;
+      }   
     writeRegister(INA226_CAL_REG, calVal);          
 }
 

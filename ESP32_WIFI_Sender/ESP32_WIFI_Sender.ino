@@ -16,8 +16,18 @@
 
 
 */
+
+#define OTAUpdates 1
+
 #include <Wire.h>
 #include <WiFi.h>
+
+#ifdef OTAUpdates
+#include <ESPmDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
+#endif
+
 #include "INA226_WE.h"
 #include <U8x8lib.h>  //Please install the library U8g2 from Oliver Kraus
 
@@ -53,7 +63,7 @@ WiFiServer server(80);
 #define I2C_SCL 22
 
 //#define SerialOutput 1  //Show Serial Textmessages for debugging
-#define Screen 1        //Commit to deactivate
+#define Screen 1        //Screen or not?
 bool firstStart = true;
 INA226_WE INAPERI = INA226_WE(0x40);
 INA226_WE INACHARGE = INA226_WE(0x44);  //Bridge at A1 - VSS
@@ -524,12 +534,49 @@ void setup() {
   INACHARGE.init();
   if ((WiFi.status() != WL_CONNECTED)) ScanNetwork();
   delay(5000);
+
+
+#ifdef OTAUpdates
+ ArduinoOTA.onStart([]() {
+      String type;
+      if (ArduinoOTA.getCommand() == U_FLASH)
+        type = "sketch";
+      else // U_SPIFFS
+        type = "filesystem";
+
+      // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+      Serial.println("Start updating " + type);
+    })
+    .onEnd([]() {
+      Serial.println("\nEnd");
+    })
+    .onProgress([](unsigned int progress, unsigned int total) {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    })
+    .onError([](ota_error_t error) {
+      Serial.printf("Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    });
+
+  ArduinoOTA.begin();
+  #endif
 }
 // SETUP END
+
+
 
 // LOOP BEGIN
 
 void loop() {
+
+#ifdef OTAUpdates
+  ArduinoOTA.handle();
+#endif
+
   if (millis() >= nextTimeControl) {
     nextTimeControl = millis() + 10000;  //after debug can set this to 10 secondes
 
@@ -704,7 +751,7 @@ void loop() {
         #endif
       }
     } else {
-      Worktimemins=0;       //New placed. It determinates the fault that Worktime is always 0
+      workTimeMins = 0;       //New placed. It determinates the fault that Worktime is always 0
       #ifdef Screen
       u8x8.setCursor(0, 2);
       u8x8.print("Sender OFF      ");
