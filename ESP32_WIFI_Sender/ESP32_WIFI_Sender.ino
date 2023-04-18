@@ -2,15 +2,15 @@
   WIFI Communicating sender with 2 possible loop
   Adjust IP according to your ESP32 value 10.0.0.150 in this example
   On your browser send :
-  http://10.0.0.150/A0   *********** to stop the sender on wire connected on output A
-  http://10.0.0.150/A1   *********** to start the sender on wire connected on output A
-  http://10.0.0.150/B0   *********** to stop the sender on wire connected on output B
-  http://10.0.0.150/B1   *********** to start the sender on wire connected on output B
+  http://10.0.0.150/A0  *************** to stop the sender on wire connected on output A
+  http://10.0.0.150/A1  *************** to start the sender on wire connected on output A
+  http://10.0.0.150/B0  *************** to stop the sender on wire connected on output B
+  http://10.0.0.150/B1  *************** to start the sender on wire connected on output B
 
-  http://10.0.0.150/sigCode/2 ******* to change the sigcode in use possible value are 0,1,2,3,4 ,see sigcode list
-  http://10.0.0.150/?   *********** to see the state of the sender
-  http://10.0.0.150/sigDuration/104    *********** to change the speed sender to 104 microsecondes
-  http://10.0.0.150/sigDuration/50    *********** to change the speed sender to 50 microsecondes
+  http://10.0.0.150/sigCode/2  ******** to change the sigcode in use possible value are 0,1,2,3,4 ,see sigcode list
+  http://10.0.0.150/?  **************** to see the state of the sender
+  http://10.0.0.150/sigDuration/104  ** to change the speed sender to 104 microsecondes
+  http://10.0.0.150/sigDuration/50  *** to change the speed sender to 50 microsecondes
 
   If USE_STATION : the sender start and stop automaticly if the mower is in the station or not
 
@@ -54,7 +54,7 @@ WiFiServer server(80);
 
 //#define SerialOutput 1  //Show Serial Textmessages for debugging
 #define Screen 1        //Commit to deactivate
-
+bool firstStart = true;
 INA226_WE INAPERI = INA226_WE(0x40);
 INA226_WE INACHARGE = INA226_WE(0x44);  //Bridge at A1 - VSS
 
@@ -313,7 +313,9 @@ static void ScanNetwork() {
   #ifdef Screen
   u8x8.clear();
   u8x8.setCursor(0, 0);
-  u8x8.print("Hotspot Lost");
+  if (!firstStart) u8x8.println("Hotspot Lost!");
+  u8x8.print("Scan Network");
+  firstStart = false;
   #endif
 
   #ifdef SerialOutput
@@ -382,7 +384,7 @@ static void ScanNetwork() {
 
     #ifdef Screen
     u8x8.setCursor(0, 1);
-    u8x8.print("Find ");
+    u8x8.print("Find ");u8x8.println(n);
     #endif
     
     for (int i = 0; i < n; ++i) {
@@ -396,8 +398,7 @@ static void ScanNetwork() {
       #endif      
       
       #ifdef Screen
-      u8x8.setCursor(0, 2);
-      u8x8.print(currentSSID);
+      u8x8.println(currentSSID);
       #endif
 
       delay(1500);
@@ -426,8 +427,10 @@ void StaticScreenParts() {
   u8x8.setCursor(0, 5);
   u8x8.print("Peri mA:");
 //line 6: Chargecurrent
+  #ifdef USE_STATION
   u8x8.setCursor(0, 6);
   u8x8.print("Charge mA:");
+  #endif
 //line 7: Area
   u8x8.setCursor(0, 7);
   u8x8.print("Area:");
@@ -519,6 +522,7 @@ void setup() {
   
   INAPERI.init();
   INACHARGE.init();
+  if ((WiFi.status() != WL_CONNECTED)) ScanNetwork();
   delay(5000);
 }
 // SETUP END
@@ -641,13 +645,13 @@ void loop() {
         if (AUTO_START_SIGNAL) {
           //always start to send a signal when mower leave station
           if (!enableSenderB) {
-            workTimeMins = 0;
+            //workTimeMins = 0;       // Wortkime is always 0... That's a fault!
             enableSenderA = true;
             digitalWrite(pinEnableA, HIGH);
             digitalWrite(pinIN1, LOW);
             digitalWrite(pinIN2, LOW);
           } else {
-            workTimeMins = 0;
+            //workTimeMins = 0;
             enableSenderB = true;
             digitalWrite(pinEnableB, HIGH);
             digitalWrite(pinIN3, LOW);
@@ -700,8 +704,9 @@ void loop() {
         #endif
       }
     } else {
+      Worktimemins=0;       //New placed. It determinates the fault that Worktime is always 0
       #ifdef Screen
-      u8x8.setCursor(2, 0);
+      u8x8.setCursor(0, 2);
       u8x8.print("Sender OFF      ");
       #endif
       #ifdef SerialOutput
