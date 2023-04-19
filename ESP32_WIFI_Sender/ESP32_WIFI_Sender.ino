@@ -98,7 +98,7 @@ float ChargeCurrent = 0.0;
 float busvoltage1 = 0.0;
 float shuntvoltage2 = 0.0;
 float busvoltage2 = 0.0;
-float loadvoltage2 = 0.0;
+// float loadvoltage2 = 0.0;
 float DcDcOutVoltage = 0.0;
 
 //*********************  Sigcode list *********************************************
@@ -578,11 +578,12 @@ void loop() {
     if (USE_PERI_CURRENT) {
 //      busvoltage1 = INAPERI.getBusVoltage_V();
       PeriCurrent = INAPERI.getCurrent_mA();
-      PeriCurrent = PeriCurrent - 25.0;                         //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
-      if (PeriCurrent <= 5) PeriCurrent = 0;                     //
+      PeriCurrent = PeriCurrent - 100.0;                         //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
+      if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;                     //
       //PeriCurrent = PeriCurrent * busvoltage1 / DcDcOutVoltage;  // it's 3.2666 = 29.4/9.0 the power is read before the DC/DC converter so the current change according : 29.4V is the Power supply 9.0V is the DC/DC output voltage (Change according your setting)
 
       if ((enableSenderA) && (PeriCurrent < PERI_CURRENT_MIN)) {
+        workTimeMins = 0;
         #ifdef Screen
         u8x8.setCursor(0, 5);
         u8x8.inverse();
@@ -653,7 +654,7 @@ void loop() {
       ChargeCurrent = INACHARGE.getCurrent_mA();
 
       if (ChargeCurrent <= 5) ChargeCurrent = 0;
-      loadvoltage2 = busvoltage2 + (shuntvoltage2 / 1000);
+      // loadvoltage2 = busvoltage2 + (shuntvoltage2 / 1000);
 
       #ifdef Screen
       u8x8.setCursor(10, 6);
