@@ -28,7 +28,7 @@
 #define AUTO_START_SIGNAL 1       // use to start sender when mower leave station
 #define I2C_SDA 21                // SDA pin
 #define I2C_SCL 22                // SCL pin
-//#define SerialOutput 1          // Show Serial Textmessages for debugging
+#define SerialOutput 1          // Show Serial Textmessages for debugging
 #define Screen 1                  // Screen or not?
 #define pinIN1 12                 // M1_IN1  ESP32 GPIO12       ( connect this pin to L298N-IN1)
 #define pinIN2 13                 // M1_IN2  ESP32 GPIO13       ( connect this pin to L298N-IN2)
@@ -95,11 +95,11 @@ unsigned long nextTimeCheckButton = 0;
 int workTimeMins = 0;
 float PeriCurrent = 0.0;
 float ChargeCurrent = 0.0;
-float busvoltage1 = 0.0;
-float shuntvoltage2 = 0.0;
-float busvoltage2 = 0.0;
+// float busvoltage1 = 0.0;
+// float shuntvoltage2 = 0.0;
+// float busvoltage2 = 0.0;
 // float loadvoltage2 = 0.0;
-float DcDcOutVoltage = 0.0;
+// float DcDcOutVoltage = 0.0;
 
 //*********************  Sigcode list *********************************************
 // must be multiple of 2 !
@@ -130,14 +130,14 @@ void IRAM_ATTR onTimer() {
 
     } else {
       #ifdef SerialOutput
-      Serial.println("ERROR");
+        Serial.println("ERROR");
       #endif      
 
       #ifdef Screen
-      u8x8.clear();
-      u8x8.setCursor(5,5);
-      u8x8.print("ERROR");      
-      delay(5000);
+        u8x8.clear();
+        u8x8.setCursor(5,5);
+        u8x8.print("ERROR");      
+        delay(5000);
       #endif
       //digitalWrite(pinEnableA, LOW);
     }
@@ -157,15 +157,15 @@ void IRAM_ATTR onTimer() {
       digitalWrite(pinIN4, LOW);
 
     } else {
-      #ifdef SerialOutput
-      Serial.println("ERROR");
+        #ifdef SerialOutput
+        Serial.println("ERROR");
       #endif
 
       #ifdef Screen
-      u8x8.clear();
-      u8x8.setCursor(5,5);
-      u8x8.print("ERROR");
-      delay(5000);
+        u8x8.clear();
+        u8x8.setCursor(5,5);
+        u8x8.print("ERROR");
+        delay(5000);
       #endif
       //digitalWrite(pinEnableA, LOW);
     }
@@ -184,15 +184,15 @@ void changeArea(byte areaInMowing) {  // not finish to dev
   enableSenderA = false;
   enableSenderB = false;
   #ifdef SerialOutput
-  Serial.print("Change to Area:");
-  Serial.println(areaInMowing);
+    Serial.print("Change to Area:");
+    Serial.println(areaInMowing);
   #endif
 
   #ifdef Screen
-  u8x8.clear();
-  u8x8.setCursor(0,0);  
-  u8x8.print("Change Area:");
-  u8x8.println(areaInMowing);
+    u8x8.clear();
+    u8x8.setCursor(0,0);  
+    u8x8.print("Change Area:");
+    u8x8.println(areaInMowing);
   #endif
   for (int uu = 0; uu <= 128; uu++) {  //clear the area
     sigcode_norm[uu] = 0;
@@ -231,34 +231,34 @@ void changeArea(byte areaInMowing) {  // not finish to dev
       break;
   }
   #ifdef SerialOutput
-  Serial.print("New sigcode in use  : ");
-  Serial.println(sigCodeInUse);
+    Serial.print("New sigcode in use  : ");
+    Serial.println(sigCodeInUse);
   #endif
 
   #ifdef Screen
-  u8x8.setCursor(0,2);
-  u8x8.print("sigCode in use:");
-  u8x8.print(sigCodeInUse);
+    u8x8.setCursor(0,2);
+    u8x8.print("sigCode in use:");
+    u8x8.print(sigCodeInUse);
   #endif
   for (int uu = 0; uu <= (sigcode_size - 1); uu++) {
     #ifdef SerialOutput
-    Serial.print(sigcode_norm[uu]);
-    Serial.print(",");
+      Serial.print(sigcode_norm[uu]);
+      Serial.print(",");
     #endif
   
 
   }
   #ifdef SerialOutput
-  Serial.println();
-  Serial.print("New sigcode size  : ");
-  Serial.println(sigcode_size);
+    Serial.println();
+    Serial.print("New sigcode size  : ");
+    Serial.println(sigcode_size);
   #endif
   
   #ifdef Screen
-  u8x8.setCursor(0,4);
-  u8x8.print("sigcode size:");
-  u8x8.print(sigcode_size);
-  delay(5000);
+    u8x8.setCursor(0,4);
+    u8x8.print("sigcode size:");
+    u8x8.print(sigcode_size);
+    delay(5000);
   #endif
 }
 // END ChangeArea
@@ -266,22 +266,30 @@ void changeArea(byte areaInMowing) {  // not finish to dev
 //********************* CONNECTION **********************************
 void connection() {
   #ifdef SerialOutput
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
+    Serial.println();
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
   #endif
+
+  #ifdef Screen
+    u8x8.clearDisplay();
+    u8x8.setCursor(0, 0);
+    u8x8.println("Connecting to:");
+    u8x8.print(ssid);
+  #endif
+
   WiFi.begin(ssid, password);
   for (int i = 0; i < 60; i++) {
     if (WiFi.status() != WL_CONNECTED) {
 
       #ifdef SerialOutput
-      Serial.println("Try connecting");
+        Serial.println("Try connecting");
       #endif
       
       #ifdef Screen
-      u8x8.clear();
-      u8x8.setCursor(0,3);
-      u8x8.print("CONNECTING");
+        u8x8.clear();
+        u8x8.setCursor(0,3);
+        u8x8.print("CONNECTING");
       #endif      
       delay(500);
     }
@@ -289,20 +297,20 @@ void connection() {
 
   if (WiFi.status() == WL_CONNECTED) {
     #ifdef SerialOutput
-    Serial.println("WiFi connected.");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
+      Serial.println("WiFi connected.");
+      Serial.println("IP address: ");
+      Serial.println(WiFi.localIP());
     #endif    
     
     #ifdef Screen
-    u8x8.clear();
-    u8x8.setCursor(0,0);
-    u8x8.print("WiFi Connected");
-    u8x8.setCursor(0,2);
-    u8x8.print("IP address:");
-    u8x8.setCursor(0,4);
-    u8x8.print(WiFi.localIP());
-    delay(2000);
+      u8x8.clear();
+      u8x8.setCursor(0,0);
+      u8x8.print("WiFi Connected");
+      u8x8.setCursor(0,2);
+      u8x8.print("IP address:");
+      u8x8.setCursor(0,4);
+      u8x8.print(WiFi.localIP());
+      delay(2000);
     #endif
    
      server.begin();
@@ -315,17 +323,19 @@ static void ScanNetwork() {
 
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
-  
+  bool findNetwork = false;
   #ifdef Screen
-  u8x8.clear();
-  u8x8.setCursor(0, 0);
-  if (!firstStart) u8x8.println("Hotspot Lost!");
-  u8x8.print("Scan Network");
-  firstStart = false;
+    u8x8.clear();
+    u8x8.setCursor(0, 0);
+    if (!firstStart) {
+      u8x8.println("Hotspot Lost!");
+    }
+    u8x8.print("Scan Network");
+    firstStart = false;
   #endif
 
   #ifdef SerialOutput
-  Serial.println("Hotspot Lost");
+    Serial.println("Hotspot Lost");
   #endif
 
   delay(5000);  // wait until all is disconnect
@@ -333,38 +343,37 @@ static void ScanNetwork() {
   if (n == -1) {
     
     #ifdef Screen
-    u8x8.setCursor(0, 1);
-    u8x8.print("Scan running...");
-    u8x8.setCursor(0, 2);
-    u8x8.print("Need Reset? ");
-    u8x8.setCursor(0, 3);
-    u8x8.print("If sender is OFF");
+      u8x8.setCursor(0, 1);
+      u8x8.print("Scan running...");
+      u8x8.setCursor(0, 2);
+      u8x8.print("Need Reset? ");
+      u8x8.setCursor(0, 3);
+      u8x8.print("If sender is OFF");
     #endif
     #ifdef SerialOutput
-    Serial.println("Scan running...");
-    Serial.println("Need reset?");
-    Serial.println("If sender is OFF");
+      Serial.println("Scan running...");
+      Serial.println("Need reset?");
+      Serial.println("If sender is OFF");
     #endif
         
     delay(5000);
     if ((!enableSenderA) && (!enableSenderB)) ESP.restart();  // do not reset if sender is ON
   }
-  if (n == -2)
-  //bug in esp32 if wifi is lost many time the esp32 fail to autoreconnect,maybe solve in other firmware ???????
+  if (n == -2)    //bug in esp32 if wifi is lost many time the esp32 fail to autoreconnect,maybe solve in other firmware ???????
   {
     
     #ifdef Screen
-    u8x8.setCursor(0, 1);
-    u8x8.print("Scan Fail.");
-    u8x8.setCursor(0, 2);
-    u8x8.print("Need Reset? ");
-    u8x8.setCursor(0, 3);
-    u8x8.print("If sender is Off");
+      u8x8.setCursor(0, 1);
+      u8x8.print("Scan Fail.");
+      u8x8.setCursor(0, 2);
+      u8x8.print("Need Reset? ");
+      u8x8.setCursor(0, 3);
+      u8x8.print("If sender is Off");
     #endif
     #ifdef SerialOutput
-    Serial.println("Scan fail.");
-    Serial.println("Need reset?");
-    Serial.println("If sender is OFF");
+      Serial.println("Scan fail.");
+      Serial.println("Need reset?");
+      Serial.println("If sender is OFF");
     #endif
         
     delay(5000);
@@ -373,46 +382,51 @@ static void ScanNetwork() {
   if (n == 0) {
 
     #ifdef Screen
-    u8x8.setCursor(0, 2);
-    u8x8.print("No networks.");
+      u8x8.setCursor(0, 2);
+      u8x8.print("No networks.");
     #endif
     #ifdef SerialOutput
-    Serial.println("No networks.");
+      Serial.println("No networks.");
     #endif
   }
 
   if (n > 0) {
     
     #ifdef SerialOutput
-    Serial.print("Find ");
-    Serial.println(n);
+      Serial.print("Find ");
+      Serial.println(n);
     #endif
 
     #ifdef Screen
-    u8x8.setCursor(0, 1);
-    u8x8.print("Find ");u8x8.println(n);
+      u8x8.clearDisplay();
+      u8x8.setCursor(0, 0);
+      u8x8.print("Find ");u8x8.println(n);u8x8.println(" ");
     #endif
     
-    for (int i = 0; i < n; ++i) {
-      // Print SSID for each network found
+    delay(1000);
+
+    for (int i = 0; i < n; ++i) {   // Print SSID for each network found
       char currentSSID[64];
+      char printCurrentSSID[16];
       WiFi.SSID(i).toCharArray(currentSSID, 64);
-      
+      WiFi.SSID(i).toCharArray(printCurrentSSID, 16);
       #ifdef SerialOutput
-      Serial.print("Find Wifi : ");
-      Serial.println(currentSSID);
+        Serial.print("Find Wifi : ");
+        Serial.println(currentSSID);
       #endif      
       
       #ifdef Screen
-      u8x8.println(currentSSID);
+        u8x8.println(printCurrentSSID);
+        delay(500);
       #endif
 
-      delay(1500);
       if (String(currentSSID) == ssid) {
-        connection();
-        i = 200;  //to avoid loop again when connected
+        findNetwork = true;
+        //i = 200;  //to avoid loop again when connected
       }
     }
+    delay(5000);
+    if (findNetwork = true) connection();
   }
 }
 // END ScanNetwork
@@ -420,25 +434,34 @@ static void ScanNetwork() {
 //********************* STATICSCREENPARTS **********************************
 void StaticScreenParts() {
 #ifdef Screen
-//line 0: Title
+  //line 0: Title
+  u8x8.clearLine(1);
+  u8x8.clearLine(3);
   u8x8.setCursor(0,0);
   u8x8.inverse();
   u8x8.print("  Teensy Sender ");
   u8x8.noInverse();
-//line 1: free
-//line 2: Sender ON/OFF
-//line 3: free
-//line 4: Worktime
+
+  //line 1: free
+ 
+  //line 2: Sender ON/OFF
+ 
+  //line 3: free
+
+  //line 4: Worktime
   u8x8.setCursor(0, 4);
   u8x8.print("Worktime:");
-//line 5: Perimetercurrent
+
+  //line 5: Perimetercurrent
   u8x8.setCursor(0, 5);
   u8x8.print("Peri mA:");
-//line 6: Chargecurrent
+
+  //line 6: Chargecurrent
   #ifdef USE_STATION
-  u8x8.setCursor(0, 6);
-  u8x8.print("Charge mA:");
+    u8x8.setCursor(0, 6);
+    u8x8.print("Charge mA:");
   #endif
+
 //line 7: Area
   u8x8.setCursor(0, 7);
   u8x8.print("Area:");
@@ -448,16 +471,16 @@ void StaticScreenParts() {
 
 //********************* SETUP **********************************
 void setup() {
-  Serial.begin(115200);
-  Wire.begin();
-  u8x8.begin();
-  u8x8.setFont(u8x8_font_5x8_f);
+  Serial.begin(115200);                           // Serial interface start
+  Wire.begin();                                   // I2C interface start
+  u8x8.begin();                                   // Screen start
+  u8x8.setFont(u8x8_font_5x8_f);                  // Screen font 
   u8x8.clear();
-  timer = timerBegin(0, 80, true);
+  timer = timerBegin(0, 80, true);                // Interrupt things
   timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, 104, true);
   timerAlarmEnable(timer);
-  pinMode(pinIN1, OUTPUT);
+  pinMode(pinIN1, OUTPUT);                        // Pinmodes
   pinMode(pinIN2, OUTPUT);
   pinMode(pinEnableA, OUTPUT);
   pinMode(pinIN3, OUTPUT);
@@ -465,19 +488,19 @@ void setup() {
   pinMode(pinEnableB, OUTPUT);
 
   #ifdef SerialOutput
-  Serial.println("START");
-  Serial.print("Teensymower Sender ");
-  Serial.println(VER);
-  Serial.print(" USE_PERI_CURRENT=");
-  Serial.println(USE_PERI_CURRENT);
+    Serial.println("START");
+    Serial.print("Teensymower Sender ");
+    Serial.println(VER);
+    Serial.print(" USE_PERI_CURRENT=");
+    Serial.println(USE_PERI_CURRENT);
   #endif
   #ifdef Screen
-  u8x8.println("START");
-  u8x8.println("Teensy Sender");
-  u8x8.print("");u8x8.println(VER);
-  u8x8.print("USE_PERI_CURR=");
-  u8x8.println(USE_PERI_CURRENT);
-  delay(2000);  
+    u8x8.println("START");
+    u8x8.println("Teensy Sender");
+    u8x8.print("");u8x8.println(VER);
+    u8x8.print("USE_PERI_CURR=");
+    u8x8.println(USE_PERI_CURRENT);
+    delay(2000);  
   #endif
 
   changeArea(sigCodeInUse);
@@ -493,42 +516,44 @@ void setup() {
   if (WiFi.config(staticIP, gateway, subnet, dns, dns) == false) {
     
     #ifdef SerialOutput
-    Serial.println("WIFI Configuration failed.");
+      Serial.println("WIFI Configuration failed.");
     #endif
   }  
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   delay(100);
+  if ((WiFi.status() != WL_CONNECTED)) ScanNetwork();
 
   //------------------------  SCREEN parts  ----------------------------------------
-  #ifdef Screen
-  u8x8.clear();
-  u8x8.setCursor(0, 0);  // Set cursor position, start of line 0
-  u8x8.print("TEENSYMOWER");  
-  u8x8.setCursor(0, 1);  // Set cursor position, start of line 1
-  u8x8.print("BB SENDER");
-  u8x8.setCursor(0, 2);  // Set cursor position, start of line 2
-  u8x8.print(VER);
-  u8x8.setCursor(0, 3);  // Set cursor position, line 2 10th character
-  u8x8.print("2 LOOPS");
+  #ifdef Screen            // 16x8 (??16x9??)
+    u8x8.clear();
+    u8x8.setCursor(0, 0);  // Set cursor position, start of line 0
+    u8x8.print("TEENSYMOWER");  
+    u8x8.setCursor(0, 1);  // Set cursor position, start of line 1
+    u8x8.print("BB SENDER");
+    u8x8.setCursor(0, 2);  // Set cursor position, start of line 2
+    u8x8.print(VER);
+    u8x8.setCursor(0, 3);  // Set cursor position, line 2 10th character
+    u8x8.print("2 LOOPS");
+    delay(5000);
+    //u8x8.clearDisplay();
   #endif
   #ifdef SerialOutput
-  Serial.println("TEENSYMOWER");
-  Serial.println("BB SENDER");
-  Serial.println(VER);
-  Serial.println("2 LOOPS");
+    Serial.println("TEENSYMOWER");
+    Serial.println("BB SENDER");
+    Serial.println(VER);
+    Serial.println("2 LOOPS");
+    delay(5000);
   #endif
-
   //------------------------  current sensor parts  ----------------------------------------
   #ifdef SerialOutput
-  Serial.println("Measuring voltage and current using INA226 ...");
+    Serial.println("Measuring voltage and current using INA226 ...");
   #endif
   
   INAPERI.init();
   INACHARGE.init();
-  if ((WiFi.status() != WL_CONNECTED)) ScanNetwork();
-  delay(5000);
-
+  // INAPERI.setResistorRange(0.010, 2.00);
+  // INACHARGE.setResistorRange(0.010, 2.00);
 
 #ifdef OTAUpdates
  ArduinoOTA.onStart([]() {
@@ -572,38 +597,39 @@ void loop() {
     nextTimeControl = millis() + 10000;  //after debug can set this to 10 secondes
 
   #ifdef Screen
-  StaticScreenParts();
+    StaticScreenParts();
   #endif
 
     if (USE_PERI_CURRENT) {
 //      busvoltage1 = INAPERI.getBusVoltage_V();
       PeriCurrent = INAPERI.getCurrent_mA();
       PeriCurrent = PeriCurrent - 100.0;                         //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
+      
       if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;                     //
       //PeriCurrent = PeriCurrent * busvoltage1 / DcDcOutVoltage;  // it's 3.2666 = 29.4/9.0 the power is read before the DC/DC converter so the current change according : 29.4V is the Power supply 9.0V is the DC/DC output voltage (Change according your setting)
 
       if ((enableSenderA) && (PeriCurrent < PERI_CURRENT_MIN)) {
         workTimeMins = 0;
         #ifdef Screen
-        u8x8.setCursor(0, 5);
-        u8x8.inverse();
-        u8x8.print("  Wire is Cut!  ");
-        u8x8.noInverse();
+          u8x8.setCursor(0, 5);
+          u8x8.inverse();
+          u8x8.print("  Wire is Cut!  ");
+          u8x8.noInverse();
         #endif
         #ifdef SerialOutput
-        Serial.println("WIRE IS CUT!!!");
+          Serial.println("WIRE IS CUT!!!");
         #endif
         
       } else {
         #ifdef Screen
-        u8x8.setCursor(8, 5);
-        u8x8.print("      ");
-        u8x8.setCursor(10, 5);
-        u8x8.print(PeriCurrent);
+          u8x8.setCursor(8, 5);
+          u8x8.print("        ");
+          u8x8.setCursor(10, 5);
+          u8x8.print(PeriCurrent);
         #endif
         #ifdef SerialOutput
-        Serial.print("Pericurr ");
-        Serial.println(PeriCurrent);
+          Serial.print("Pericurr ");
+          Serial.println(PeriCurrent);
         #endif
       }
     }
@@ -631,40 +657,40 @@ void loop() {
     nextTimeSec = millis() + 1000;
 
     #ifdef Screen
-    u8x8.setCursor(9, 4);
-    u8x8.print("      ");
-    u8x8.setCursor(10, 4);
-    u8x8.print(workTimeMins);
+      u8x8.setCursor(9, 4);
+      u8x8.print("      ");
+      u8x8.setCursor(10, 4);
+      u8x8.print(workTimeMins);
     
-    //line 7: Area
-    u8x8.setCursor(10, 7);
-    u8x8.print("     ");
-    u8x8.setCursor(10, 7);
-    u8x8.print(sigCodeInUse);
+      //line 7: Area
+      u8x8.setCursor(10, 7);
+      u8x8.print("     ");
+      u8x8.setCursor(10, 7);
+      u8x8.print(sigCodeInUse);
     #endif
     #ifdef SerialOutput
-    Serial.print("Area:");
-    Serial.println(sigCodeInUse);
+      Serial.print("Area:");
+      Serial.println(sigCodeInUse);
     #endif
 
     if (USE_STATION) {
 
-      busvoltage2 = INACHARGE.getBusVoltage_V();
-      shuntvoltage2 = INACHARGE.getShuntVoltage_mV();
+      //busvoltage2 = INACHARGE.getBusVoltage_V();
+      //shuntvoltage2 = INACHARGE.getShuntVoltage_mV();
       ChargeCurrent = INACHARGE.getCurrent_mA();
 
       if (ChargeCurrent <= 5) ChargeCurrent = 0;
       // loadvoltage2 = busvoltage2 + (shuntvoltage2 / 1000);
 
       #ifdef Screen
-      u8x8.setCursor(10, 6);
-      u8x8.print("     ");
-      u8x8.setCursor(10, 6);
-      u8x8.print(ChargeCurrent);
+        u8x8.setCursor(10, 6);
+        u8x8.print("        ");
+        u8x8.setCursor(10, 6);
+        u8x8.print(ChargeCurrent);
       #endif
       #ifdef SerialOutput
-      Serial.print("Charcurr ");
-      Serial.println(ChargeCurrent);
+        Serial.print("Charcurr ");
+        Serial.println(ChargeCurrent);
       #endif
 
       if (ChargeCurrent > 5) {  //mower is into the station ,in my test 410 ma are drained so possible to stop sender
@@ -708,53 +734,53 @@ void loop() {
     if ((enableSenderA) || (enableSenderB)) {
 
       #ifdef Screen
-      u8x8.setCursor(0, 2);
-      u8x8.print("Sender ON :     ");
+        u8x8.setCursor(0, 2);
+        u8x8.print("Sender ON :     ");
       #endif
       #ifdef SerialOutput
-      Serial.print("Sender ON : ");
+        Serial.print("Sender ON : ");
       #endif
 
       if (enableSenderA && !enableSenderB) {
         #ifdef Screen
-        u8x8.setCursor(10, 2);
-        u8x8.print("A");
+          u8x8.setCursor(10, 2);
+          u8x8.print("A");
         #endif
         #ifdef SerialOutput
-        Serial.print("A");
+          Serial.print("A");
         #endif
       }
       if (enableSenderB && !enableSenderA) {
         #ifdef Screen
-        u8x8.setCursor(10, 2);
-        u8x8.print("B");
+          u8x8.setCursor(10, 2);
+          u8x8.print("B");
         #endif
         #ifdef SerialOutput
-        Serial.print("B");
+          Serial.print("B");
         #endif
       }
       if (enableSenderA && enableSenderB) {
         #ifdef Screen
-        u8x8.setCursor(10, 2);
-        u8x8.print("AB");
+          u8x8.setCursor(10, 2);
+          u8x8.print("AB");
         #endif
         #ifdef SerialOutput
-        Serial.print("AB");
+          Serial.print("AB");
         #endif
       }
     } else {
       workTimeMins = 0;       //New placed. It determinates the fault that Worktime is always 0
       #ifdef Screen
-      u8x8.setCursor(0, 2);
-      u8x8.print("Sender OFF      ");
+        u8x8.setCursor(0, 2);
+        u8x8.print("Sender OFF      ");
       #endif
       #ifdef SerialOutput
-      Serial.print("Sender OFF");
+        Serial.print("Sender OFF");
       #endif
 
     }
     #ifdef SerialOutput
-    Serial.println("");
+      Serial.println("");
     #endif
   }
 
@@ -770,9 +796,9 @@ void loop() {
     String req = client.readStringUntil('\r');
     if (req == "") return;
     #ifdef SerialOutput
-    Serial.print("Client say  ");
-    Serial.println(req);
-    Serial.println("------------------------ - ");
+      Serial.print("Client say  ");
+      Serial.println(req);
+      Serial.println("------------------------ - ");
     #endif
     // Match the request
     if (req.indexOf("GET /A0") != -1) {
@@ -786,7 +812,7 @@ void loop() {
   
       // Send the response to the client
       #ifdef SerialOutput
-      Serial.println(sResponse);
+        Serial.println(sResponse);
       #endif
       client.print(sResponse);
       client.flush();
@@ -802,7 +828,7 @@ void loop() {
   
       // Send the response to the client
       #ifdef SerialOutput
-      Serial.println(sResponse);
+        Serial.println(sResponse);
       #endif
       client.print(sResponse);
       client.flush();
@@ -820,7 +846,7 @@ void loop() {
  
       // Send the response to the client
       #ifdef SerialOutput
-      Serial.println(sResponse);
+        Serial.println(sResponse);
       #endif
       client.print(sResponse);
       client.flush();
@@ -838,7 +864,7 @@ void loop() {
  
       // Send the response to the client
       #ifdef SerialOutput
-      Serial.println(sResponse);
+        Serial.println(sResponse);
       #endif
       client.print(sResponse);
       client.flush();
@@ -864,7 +890,7 @@ void loop() {
       sResponse += enableSenderB;
 
       #ifdef SerialOutput
-      Serial.println(sResponse);
+        Serial.println(sResponse);
       #endif
       client.print(sResponse);
       client.flush();
@@ -880,7 +906,7 @@ void loop() {
  
       // Send the response to the client
       #ifdef SerialOutput
-      Serial.println(sResponse);
+        Serial.println(sResponse);
       #endif
       client.print(sResponse);
       client.flush();
@@ -895,7 +921,7 @@ void loop() {
  
       // Send the response to the client
       #ifdef SerialOutput
-      Serial.println(sResponse);
+        Serial.println(sResponse);
       #endif
       client.print(sResponse);
       client.flush();
@@ -911,7 +937,7 @@ void loop() {
  
       // Send the response to the client
       #ifdef SerialOutput
-      Serial.println(sResponse);
+        Serial.println(sResponse);
       #endif
       client.print(sResponse);
       client.flush();
@@ -927,7 +953,7 @@ void loop() {
  
       // Send the response to the client
       #ifdef SerialOutput
-      Serial.println(sResponse);
+        Serial.println(sResponse);
       #endif
       client.print(sResponse);
       client.flush();
@@ -943,7 +969,7 @@ void loop() {
  
       // Send the response to the client
       #ifdef SerialOutput
-      Serial.println(sResponse);
+        Serial.println(sResponse);
       #endif
       client.print(sResponse);
       client.flush();
@@ -958,7 +984,7 @@ void loop() {
  
       // Send the response to the client
       #ifdef SerialOutput
-      Serial.println(sResponse);
+        Serial.println(sResponse);
       #endif
       client.print(sResponse);
       client.flush();
@@ -974,7 +1000,7 @@ void loop() {
  
       // Send the response to the client
       #ifdef SerialOutput
-      Serial.println(sResponse);
+        Serial.println(sResponse);
       #endif
       client.print(sResponse);
       client.flush();
