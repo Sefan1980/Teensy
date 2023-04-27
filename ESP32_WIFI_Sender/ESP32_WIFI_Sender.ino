@@ -75,6 +75,7 @@ IPAddress dns(192,168,178,1);  // put here one dns (IP of your routeur)
 WiFiServer server(80);
 
 //********************* other **********************************
+int column = 2;                                         //used in function scanNetwork. It's for the Screen. (Print SSID for each network found)
 bool firstStart = true;
 INA226_WE INAPERI = INA226_WE(0x40);                    // without bridge
 INA226_WE INACHARGE = INA226_WE(0x44);                  // Bridge at A1 - VSS
@@ -276,6 +277,7 @@ void connection() {
     u8x8.setCursor(0, 0);
     u8x8.println("Connecting to:");
     u8x8.print(ssid);
+    delay(1500);
   #endif
 
   WiFi.begin(ssid, password);
@@ -287,7 +289,6 @@ void connection() {
       #endif
       
       #ifdef Screen
-        u8x8.clear();
         u8x8.setCursor(0,3);
         u8x8.print("CONNECTING");
       #endif      
@@ -310,7 +311,7 @@ void connection() {
       u8x8.print("IP address:");
       u8x8.setCursor(0,4);
       u8x8.print(WiFi.localIP());
-      delay(2000);
+      delay(1000);
     #endif
    
      server.begin();
@@ -416,8 +417,17 @@ static void ScanNetwork() {
       #endif      
       
       #ifdef Screen
-        u8x8.println(printCurrentSSID);
+        if(column >= 8) {
+          column = 2;
+          delay(2000);
+          u8x8.clearDisplay();
+          u8x8.setCursor(0, 0);
+          u8x8.print("Find ");u8x8.println(n);u8x8.println(" ");
+        }
+        u8x8.setCursor(0, column);
+        u8x8.print(printCurrentSSID);
         delay(500);
+        column++;
       #endif
 
       if (String(currentSSID) == ssid) {
@@ -435,18 +445,19 @@ static void ScanNetwork() {
 void StaticScreenParts() {
 #ifdef Screen
   //line 0: Title
-  u8x8.clearLine(1);
-  u8x8.clearLine(3);
   u8x8.setCursor(0,0);
   u8x8.inverse();
-  u8x8.print("  Teensy Sender ");
+  u8x8.print(" Teensy Sender  ");
   u8x8.noInverse();
 
   //line 1: free
- 
+  u8x8.clearLine(1);
+
   //line 2: Sender ON/OFF
- 
+  u8x8.clearLine(2);
+
   //line 3: free
+  u8x8.clearLine(3);
 
   //line 4: Worktime
   u8x8.setCursor(0, 4);
@@ -464,7 +475,7 @@ void StaticScreenParts() {
 
 //line 7: Area
   u8x8.setCursor(0, 7);
-  u8x8.print("Area:");
+  u8x8.print("Mowarea:");
 #endif  
 }
 // END StaticScreenParts
@@ -622,8 +633,8 @@ void loop() {
         
       } else {
         #ifdef Screen
-          u8x8.setCursor(8, 5);
-          u8x8.print("        ");
+          u8x8.setCursor(10, 5);
+          u8x8.print("      ");
           u8x8.setCursor(10, 5);
           u8x8.print(PeriCurrent);
         #endif
@@ -658,13 +669,13 @@ void loop() {
 
     #ifdef Screen
       u8x8.setCursor(9, 4);
-      u8x8.print("      ");
+      u8x8.print("       ");
       u8x8.setCursor(10, 4);
       u8x8.print(workTimeMins);
     
       //line 7: Area
       u8x8.setCursor(10, 7);
-      u8x8.print("     ");
+      u8x8.print("      ");
       u8x8.setCursor(10, 7);
       u8x8.print(sigCodeInUse);
     #endif
@@ -684,7 +695,7 @@ void loop() {
 
       #ifdef Screen
         u8x8.setCursor(10, 6);
-        u8x8.print("        ");
+        u8x8.print("      ");
         u8x8.setCursor(10, 6);
         u8x8.print(ChargeCurrent);
       #endif
