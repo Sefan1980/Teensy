@@ -43,12 +43,12 @@ Mower::Mower() {
   motorLeftChange = 500;
   motorRightChange = 500;
   motorOdoAccel = 1500; //Time for accel from 0 to 100% in ms
-  motorSpeedMaxRpm       = 30;   // motor wheel max RPM (WARNING: do not set too high, so there's still speed control when battery is low!)
-  motorSpeedMaxPwm    = 108;  // motor wheel max Pwm  (8-bit PWM=255, 10-bit PWM=1023)
-  motorPowerMax     = 20;    // motor wheel max power (Watt)
+  motorSpeedMaxRpm       = 33;   // motor wheel max RPM (WARNING: do not set too high, so there's still speed control when battery is low!)
+  motorSpeedMaxPwm    = 140;  // motor wheel max Pwm  (8-bit PWM=255, 10-bit PWM=1023)
+  motorPowerMax     = 9;    // motor wheel max power (Watt)
   motorSenseRightScale = 1.870; // normal is 1.536 motor right sense scale (mA=(ADC-zero)/scale)
   motorSenseLeftScale = 1.650; // normal is 1.536 motor left sense scale  (mA=(ADC-zero)/scale)
-  motorPowerIgnoreTime = 2000; // time to ignore motor power when start to avoid read the peack on motor start (ms)
+  motorPowerIgnoreTime = 1500; // time to ignore motor power when start to avoid read the peack on motor start (ms)
   motorZeroSettleTime   = 2000 ; // defaut 3000 how long (ms) to wait for motors to settle at zero speed
   motorRollDegMax    = 100;  // max. roll Deg
   motorRollDegMin    = 20; //min. roll Deg
@@ -70,16 +70,16 @@ Mower::Mower() {
   UseBrakeRight = 1;
   AngleRotate = 100;
   SpeedOdoMin = 50;
-  SpeedOdoMax = 140;
+  SpeedOdoMax = 120;
   odoLeftRightCorrection     = true;       // left-right correction for straight lines used in manual mode
   autoAdjustSlopeSpeed = true;  //adjust the speed on slope to have same speed on uphill and downhill
   useMotorDriveBrake = false;   //for ZS-X11H BL motor driver it's possible to use the brake option for slope management
 
   // ------ mower motor -------------------------------
   motorMowAccel       = 1000;  // motor mower acceleration (warning: do not set too low) 2000 seems to fit best considerating start time and power consumption
-  motorMowSpeedMaxPwm   = 115;    // motor mower max PWM
+  motorMowSpeedMaxPwm   = 255;    // motor mower max PWM
   motorMowSpeedMinPwm = 100;   // motor mower minimum PWM (only for cutter modulation)
-  motorMowPowerMax = 65.0;     // motor mower max power (Watt)
+  motorMowPowerMax = 40;     // motor mower max power (Watt)
   highGrassSpeedCoeff = 0.7;  //drive speed coeff when detect high grass in by lane mode
 
   motorMowPID.Kp = 0.005;    // motor mower RPM PID controller
@@ -96,7 +96,7 @@ Mower::Mower() {
 
   // ------ DHT22Use ------------------------------------
   //DHT22Use          = 0;      // use DHT22 sensor?
-  maxTemperature    = 55;     // max temp before switch off
+  maxTemperature    = 68;     // max temp before switch off
   //bber35
   // ------ RFID ------------------------------------
   rfidUse          = 0;      // use rfid
@@ -125,7 +125,7 @@ Mower::Mower() {
   perimeterTrackRevTime = 2200;  // reverse time during perimeter tracking
   DistPeriOutRev = 40; // reverse distance when reach the perimeter in cm
   DistPeriObstacleRev = 30; // reverse distance when hit obstacle while tracking in cm
-  if ( LEFT_MOTOR_DRIVER == 1) {
+  if (( LEFT_MOTOR_DRIVER == 1) || ( LEFT_MOTOR_DRIVER == 4)) {
     DistPeriOutForw = 15; // distance to accell reduce when BL motor is used
   }
   else
@@ -141,7 +141,7 @@ Mower::Mower() {
   trackingErrorTimeOut = 10000;
   trakBlockInnerWheel = true;
   //bb
-  MaxSpeedperiPwm = 85; // speed max in PWM while perimeter tracking
+  MaxSpeedperiPwm = 65; // speed max in PWM while perimeter tracking
   ActualSpeedPeriPWM = MaxSpeedperiPwm; //speed in PWM while perimeter tracking
   //timeToResetSpeedPeri = 0; // if millis() > at this var the speed is set to max value
   RollTimeFor45Deg = 1000; //time while roll in peri obstacle avoid if no Odometry
@@ -176,10 +176,10 @@ Mower::Mower() {
   maxDriftPerSecond = 0.05; //limit the stop time if small drift
   maxDurationDmpAutocalib = 60; //in sec
   delayBetweenTwoDmpAutocalib = 360; //in sec
-  yawCiblePos = 60;
-  yawCibleNeg = -60;
-  DistBetweenLane = 20;
-  maxLenghtByLane = 9;  // distance to run in bylane before simulate a wire detection
+  yawCiblePos = 30;
+  yawCibleNeg = -30;
+  DistBetweenLane = 17;
+  maxLenghtByLane = 15;  // distance to run in bylane before simulate a wire detection
   justChangeLaneDir = true;
   mowPatternCurr = MOW_LANES;
   compassRollSpeedCoeff = 40; //speed used when the mower search the compass yaw it's percent of motorSpeedMaxRpm ,Avoid to roll to fast for a correct detection
@@ -189,15 +189,15 @@ Mower::Mower() {
   remoteUse         = 0;       // use model remote control (R/C)?
   // ------ battery -------------------------------------
   batMonitor = true;              // monitor battery and charge voltage?
-  batGoHomeIfBelow = 24.3;     // drive home voltage (Volt)
+  batGoHomeIfBelow = 24.5;     // drive home voltage (Volt)
   batSwitchOffIfBelow = 23;  // switch off battery if below voltage (Volt)
   batSwitchOffIfIdle = 60;      // switch off battery if idle (minutes)
   batFactor       = 1.00;     //not use
   batChgFactor    = 1.00;     //not use
   batFull          = 29.4;     // battery reference Voltage (fully charged) PLEASE ADJUST IF USING A DIFFERENT BATTERY VOLTAGE! FOR a 12V SYSTEM TO 14.4V
   batChargingCurrentMax = 2; // maximum current your charger can devliver
-  batFullCurrent  = 0.05;      // current flowing when battery is fully charged
-  startChargingIfBelow = 25.0; // start charging if battery Voltage is below
+  batFullCurrent  = 0.12;      // current flowing when battery is fully charged
+  startChargingIfBelow = 29.0; // start charging if battery Voltage is below
   chargingTimeout = 36000000; // safety timer for charging (ms)  10 hrs
 
   batSenseFactor  = 1.11;         // charge current conversion factor   - Empfindlichkeit nimmt mit ca. 39/V Vcc ab
@@ -205,8 +205,8 @@ Mower::Mower() {
   //chgChange       = 0;          // Messwertumkehr von - nach +         1 oder 0
   //chgNull         = 2;          // Nullduchgang abziehen (1 oder 2)
   // ------  charging station ---------------------------
-  stationRevDist     = 50;    // charge station reverse 50 cm
-  stationRollAngle    = 45;    // charge station roll after reverse
+  stationRevDist     = 75;    // charge station reverse 50 cm
+  stationRollAngle    = 55;    // charge station roll after reverse
   stationForwDist    = 30;    // charge station accel distance cm
   stationCheckDist   = 2;    // charge station  check distance to be sure voltage is OK cm
   UseBumperDock = false; //bumper is pressed when docking or not
@@ -217,9 +217,9 @@ Mower::Mower() {
 
   // ------ odometry ------------------------------------
   odometryUse       = 1;       // use odometry?
-  odometryTicksPerRevolution = 1145;   // encoder ticks per one full resolution
-  odometryTicksPerCm = 17;  // encoder ticks per cm
-  odometryWheelBaseCm = 30,5;    // wheel-to-wheel distance (cm)
+  odometryTicksPerRevolution = 1147;   // encoder ticks per one full resolution
+  odometryTicksPerCm = 17.8;  // encoder ticks per cm
+  odometryWheelBaseCm = 30.5;    // wheel-to-wheel distance (cm)
 
   // ----- GPS -------------------------------------------
   gpsUse                     = 0;          // use GPS?
@@ -228,9 +228,9 @@ Mower::Mower() {
 
 
   // ----- other -----------------------------------------
-  buttonUse         = 1;       // has digital ON/OFF button?
+  buttonUse         = 0;       // has digital ON/OFF button?
   RaspberryPIUse = false; // a raspberryPi is connected to USBNative port
-  mowPatternDurationMax = 12; //in minutes
+  mowPatternDurationMax = 120; //in minutes
   useMqtt = false; //select this to exchange data over mqtt protocol for homeassistant.
 
 
@@ -239,7 +239,7 @@ Mower::Mower() {
   userSwitch2       = 0;       // user-defined switch 2 (default value)
   userSwitch3       = 0;       // user-defined switch 3 (default value)
   // ----- timer -----------------------------------------
-  timerUse          = 1;       // use RTC and timer?
+  timerUse          = 0;       // use RTC and timer?
 
   // ------ mower stats-------------------------------------------
   statsOverride = false; // if set to true mower stats are overwritten - be careful
@@ -283,27 +283,36 @@ Mower::Mower() {
 #if defined (MOW800)
   name = "MOW800"; //Set the Name of platform
   // ------- wheel motors -----------------------------
-  motorRightSwapDir     = false;    // inverse right motor direction?
-  motorLeftSwapDir      = true;    // inverse left motor direction?
-  motorSpeedMaxRpm       = 28;   // motor wheel max RPM (WARNING: do not set too high, so there's still speed control when battery is low!)
-  motorSpeedMaxPwm    = 120;  // motor wheel max Pwm  (8-bit PWM=255, 10-bit PWM=1023)
-  motorRollDegMax    = 100;  // max. roll Deg
-  motorRollDegMin    = 20; //min. roll Deg
+  motorRightSwapDir     = true;    // inverse right motor direction?
+  motorLeftSwapDir      = false;    // inverse left motor direction?
+  //motorSpeedMaxRpm       = 39;   // motor wheel max RPM (WARNING: do not set too high, so there's still speed control when battery is low!)
+  motorSpeedMaxRpm       = 33;   // motor wheel max RPM (WARNING: do not set too high, so there's still speed control when battery is low!)
+  //motorSpeedMaxPwm    = 180;  // motor wheel max Pwm  (8-bit PWM=255, 10-bit PWM=1023)
+  motorSpeedMaxPwm    = 140;  // motor wheel max Pwm  (8-bit PWM=255, 10-bit PWM=1023)
+  //motorRollDegMax    = 100;  // max. roll Deg
+  motorRollDegMax    = 120;  // max. roll Deg
+  //motorRollDegMin    = 20; //min. roll Deg
+  motorRollDegMin    = 45; //min. roll Deg
+  //SpeedOdoMin = 50;
   SpeedOdoMin = 50;
+  //SpeedOdoMax = 140;
   SpeedOdoMax = 120;
-  useMotorDriveBrake = false;   //for ZS-X11H BL motor driver it's possible to use the brake option for slope management
+  useMotorDriveBrake = true;   //for ZS-X11H BL motor driver it's possible to use the brake option for slope management
 
   motorMowSpeedMaxPwm   = 210;    // motor mower max PWM
-  motorMowSpeedMinPwm = 150;   // motor mower minimum PWM (only for cutter modulation)
+  motorMowSpeedMinPwm = 100;   // motor mower minimum PWM (only for cutter modulation)
   motorMowPowerMax = 30.0;     // motor mower max power (Watt)
   highGrassSpeedCoeff = 0.7;  //drive speed coeff when detect high grass in by lane mode
 
-  perimeterTriggerMinSmag = 300;
-  MaxSpeedperiPwm = 10080; // speed max in PWM while perimeter tracking
+  perimeterTriggerMinSmag = 800;
+  MaxSpeedperiPwm = 60; // speed max in PWM while perimeter tracking
   perimeterMagMaxValue = 12000; // Maximum value return when near the perimeter wire (use for tracking and slowing when near wire
 
-  odometryTicksPerRevolution = 1145;   // encoder ticks per one full resolution
-  odometryTicksPerCm = 17;  // encoder ticks per cm
+  //odometryTicksPerRevolution = 1200;   // encoder ticks per one full resolution
+  odometryTicksPerRevolution = 1147;   // encoder ticks per one full resolution
+  //odometryTicksPerCm = 21.3;  // encoder ticks per cm
+  odometryTicksPerCm = 17.8;  // encoder ticks per cm
+  //odometryWheelBaseCm = 33;    // wheel-to-wheel distance (cm)
   odometryWheelBaseCm = 30.5;    // wheel-to-wheel distance (cm)
 
 #endif
@@ -407,7 +416,7 @@ void Mower::setup() {
 
   analogWriteFrequency(pinMotorLeftPWM, 10000);//default value
   analogWriteFrequency(pinMotorLeftDir, 10000);
-  if (LEFT_MOTOR_DRIVER == 1) {
+  if ((LEFT_MOTOR_DRIVER == 1) || (LEFT_MOTOR_DRIVER == 4)){
     analogWriteFrequency(pinMotorLeftPWM, PWM_FREQUENCY_ZSX11HV1);
     analogWriteFrequency(pinMotorLeftDir, PWM_FREQUENCY_ZSX11HV1);
   }
@@ -430,7 +439,7 @@ void Mower::setup() {
 
   analogWriteFrequency(pinMotorRightPWM, 10000);//default value
   analogWriteFrequency(pinMotorRightDir, 10000);
-  if (RIGHT_MOTOR_DRIVER == 1) {
+  if ((RIGHT_MOTOR_DRIVER == 1) || (RIGHT_MOTOR_DRIVER == 4)) {
     analogWriteFrequency(pinMotorRightPWM, PWM_FREQUENCY_ZSX11HV1);
     analogWriteFrequency(pinMotorRightDir, PWM_FREQUENCY_ZSX11HV1);
   }
@@ -482,7 +491,7 @@ void Mower::setup() {
 
 
   // odometry
-  if (LEFT_MOTOR_DRIVER == 1) {  //for BL motor no need pull_up
+  if ((LEFT_MOTOR_DRIVER == 1) || (LEFT_MOTOR_DRIVER == 4)){  //for BL motor no need pull_up
     pinMode(pinOdometryLeft, INPUT);
     pinMode(pinOdometryRight, INPUT);
   }
@@ -594,19 +603,39 @@ void Mower::setActuator(char type, int value) {
       if (MOW_MOTOR_DRIVER == 1) setZSX11HV1(pinMotorMowDir, pinMotorMowPWM, pinMotorMowBrake, abs(value), useMotorDriveBrake);
       if (MOW_MOTOR_DRIVER == 2) setL298N(pinMotorMowDir, pinMotorMowPWM, pinMotorMowEnable, abs(value));
       if (MOW_MOTOR_DRIVER == 3) setBTS7960(pinMotorMowDir, pinMotorMowPWM, pinMotorMowEnable, abs(value));
+      if (MOW_MOTOR_DRIVER == 4) setZSX12HV1(pinMotorMowDir, pinMotorMowPWM, pinMotorMowBrake, abs(value), useMotorDriveBrake);
       break;
 
     case ACT_MOTOR_LEFT:
       if (LEFT_MOTOR_DRIVER == 1) {
         setZSX11HV1(pinMotorLeftDir, pinMotorLeftPWM, pinMotorLeftBrake, value, useMotorDriveBrake);
       }
+      if (LEFT_MOTOR_DRIVER == 4) {
+        setZSX12HV1(pinMotorLeftDir, pinMotorLeftPWM, pinMotorLeftBrake, value, useMotorDriveBrake);
+      }
       if (LEFT_MOTOR_DRIVER == 2) setL298N(pinMotorLeftDir, pinMotorLeftPWM, pinMotorLeftEnable, value);
       if (LEFT_MOTOR_DRIVER == 3) setBTS7960(pinMotorLeftDir, pinMotorLeftPWM, pinMotorLeftEnable, value);
       break;
 
     case ACT_MOTOR_RIGHT:
-      if (RIGHT_MOTOR_DRIVER == 1) {
-        setZSX11HV1(pinMotorRightDir, pinMotorRightPWM, pinMotorRightBrake, value, useMotorDriveBrake);
+      if (RIGHT_MOTOR_DRIVER == 1)  {
+        //setZSX11HV1(pinMotorRightDir, pinMotorRightPWM, pinMotorRightBrake, value, useMotorDriveBrake);
+        if (value >= 0) {
+          setZSX11HV1(pinMotorRightDir, pinMotorRightPWM, pinMotorRightBrake, value * (1 + (double)motorRightOffsetFwd / 100), useMotorDriveBrake);
+        }
+        else {
+          setZSX11HV1(pinMotorRightDir, pinMotorRightPWM, pinMotorRightBrake, value * (1 - (double)motorRightOffsetRev / 100), useMotorDriveBrake);
+        }
+      }
+      if (RIGHT_MOTOR_DRIVER == 4)  {
+        //setZSX12HV1(pinMotorRightDir, pinMotorRightPWM, pinMotorRightBrake, value, useMotorDriveBrake);
+        if (value >= 0) {
+          setZSX12HV1(pinMotorRightDir, pinMotorRightPWM, pinMotorRightBrake, value * (1 + (double)motorRightOffsetFwd / 100), useMotorDriveBrake);
+        }
+        else {
+          setZSX12HV1(pinMotorRightDir, pinMotorRightPWM, pinMotorRightBrake, value * (1 - (double)motorRightOffsetRev / 100), useMotorDriveBrake);
+        }
+        
       }
       if (RIGHT_MOTOR_DRIVER == 2) setL298N(pinMotorRightDir, pinMotorRightPWM, pinMotorRightEnable, value);
       if (RIGHT_MOTOR_DRIVER == 3) setBTS7960(pinMotorRightDir, pinMotorRightPWM, pinMotorRightEnable, value);

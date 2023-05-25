@@ -11,10 +11,11 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Start Bluetooth");
   ESP_BT.begin("TEENSY");
-  Serial.println("Bluetooth started with name TEENSY  Wait 10 seconde......");
+  Serial.println("Bluetooth started with name: TEENSY");
+  Serial.println("Wait 10 seconds......");
   delay(10000);
   
-  Serial.println("Try to connect to DUE");
+  Serial.println("Try to connect to Teensy");
   Serial2.begin(115200);
   Serial.println("Connected");
   

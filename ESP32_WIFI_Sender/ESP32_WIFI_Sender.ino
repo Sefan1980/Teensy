@@ -14,7 +14,7 @@
 
   If USE_STATION : the sender start and stop automaticly if the mower is in the station or not
 
-
+  ------VERSION VON STEFAN------
 */
 
 //********************* defines **********************************
@@ -22,13 +22,13 @@
 #define USE_STATION 1             // a station is connected and is used to charge the mower
 #define USE_PERI_CURRENT 1        // use Feedback for perimeter current measurements? (set to '0' if not connected!)
 #define USE_BUTTON 0              // use button to start mowing or send mower to station not finish to dev
-#define USE_RAINFLOW 0            // check the amount of rain not finish to dev on 31/08/2020
+//#define USE_RAINFLOW 0            // check the amount of rain not finish to dev on 31/08/2020
 #define WORKING_TIMEOUT_MINS 300  // timeout for perimeter switch-off if robot not in station (minutes)
 #define PERI_CURRENT_MIN 200      // minimum milliAmpere for cutting wire detection
 #define AUTO_START_SIGNAL 1       // use to start sender when mower leave station
 #define I2C_SDA 21                // SDA pin
 #define I2C_SCL 22                // SCL pin
-#define SerialOutput 1          // Show Serial Textmessages for debugging
+//#define SerialOutput 1          // Show Serial Textmessages for debugging
 #define Screen 1                  // Screen or not?
 #define pinIN1 12                 // M1_IN1  ESP32 GPIO12       ( connect this pin to L298N-IN1)
 #define pinIN2 13                 // M1_IN2  ESP32 GPIO13       ( connect this pin to L298N-IN2)
@@ -563,8 +563,8 @@ void setup() {
   
   INAPERI.init();
   INACHARGE.init();
-  // INAPERI.setResistorRange(0.010, 2.00);
-  // INACHARGE.setResistorRange(0.010, 2.00);
+  INAPERI.setResistorRange(0.021, 8.00);
+  INACHARGE.setResistorRange(0.021, 8.00);
 
 #ifdef OTAUpdates
  ArduinoOTA.onStart([]() {
@@ -633,8 +633,8 @@ void loop() {
         
       } else {
         #ifdef Screen
-          u8x8.setCursor(10, 5);
-          u8x8.print("      ");
+          u8x8.setCursor(8, 5);
+          u8x8.print("        ");
           u8x8.setCursor(10, 5);
           u8x8.print(PeriCurrent);
         #endif

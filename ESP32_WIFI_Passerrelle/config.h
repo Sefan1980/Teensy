@@ -1,8 +1,8 @@
 
 #define BLUETOOTH
 //Select one of the 2 possibility AP (access point) or STA (station)
-#define MODE_AP // phone connects directly to ESP32 inside the mower 
-//#define MODE_STA // ESP32 and phone connects to wifi routeur
+//#define MODE_AP // phone connects directly to ESP32 inside the mower 
+#define MODE_STA // ESP32 and phone connects to wifi routeur
 #define PROTOCOL_TCP
 #define bufferSize 1024
 
@@ -14,11 +14,11 @@ bool debug = true;
 // For standard mode:
 //you need to set a fix IP and gateway according to your routeur value
 // ssid and password according your routeur
-const char *ssid = "Your ssid";  // You will connect your phone to this Access Point
-const char *pw = "Your password"; // and this is the password
+const char *ssid = "Sefan Wlan 2,4Ghz";  // You will connect your phone to this Access Point
+const char *pw = "**********"; // and this is the password
 //for pfod use this IP and port 8881
-IPAddress ip(10, 0, 0, 122); //
-IPAddress gateway(10, 0, 0, 1); //
+IPAddress ip(192, 168, 178, 223); //
+IPAddress gateway(192, 168, 178, 1); //
 IPAddress netmask(255, 255, 255, 0);
 #endif
 

@@ -1,4 +1,4 @@
-//new passerelle for ESP32
+//new passerelle for ESP32 - USE "HUGE APP"
 //Possible use of ESP32 as standalone Access point or station
 // See config.h for parameter
 #include "config.h"
