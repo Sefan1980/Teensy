@@ -95,7 +95,9 @@ unsigned long nextTimeSec = 0;
 unsigned long nextTimeCheckButton = 0;
 int workTimeMins = 0;
 float PeriCurrent = 0.0;
+float PeriVoltage = 0.0;
 float ChargeCurrent = 0.0;
+float ChargeVoltage = 0.0;
 // float busvoltage1 = 0.0;
 // float shuntvoltage2 = 0.0;
 // float busvoltage2 = 0.0;
@@ -563,8 +565,8 @@ void setup() {
   
   INAPERI.init();
   INACHARGE.init();
-  INAPERI.setResistorRange(0.021, 8.00);
-  INACHARGE.setResistorRange(0.021, 8.00);
+  INAPERI.setResistorRange(0.1, 0.8);
+  INACHARGE.setResistorRange(0.1, 0.8);
 
 #ifdef OTAUpdates
  ArduinoOTA.onStart([]() {
@@ -616,9 +618,9 @@ void loop() {
       PeriCurrent = INAPERI.getCurrent_mA();
       PeriCurrent = PeriCurrent - 100.0;                         //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
       
-      if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;                     //
-      //PeriCurrent = PeriCurrent * busvoltage1 / DcDcOutVoltage;  // it's 3.2666 = 29.4/9.0 the power is read before the DC/DC converter so the current change according : 29.4V is the Power supply 9.0V is the DC/DC output voltage (Change according your setting)
-
+      PeriCurrent = PeriCurrent * INACHARGE.getBusVoltage_V() / INAPERI.getBusVoltage_V();  // it's 3.2666 = 29.4/9.0 the power is read before the DC/DC converter so the current change according : 29.4V is the Power supply 9.0V is the DC/DC output voltage (Change according your setting)
+      if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;
+      PeriVoltage = INAPERI.getBusVoltage_V() + INAPERI.getShuntVoltage_V();
       if ((enableSenderA) && (PeriCurrent < PERI_CURRENT_MIN)) {
         workTimeMins = 0;
         #ifdef Screen
@@ -641,6 +643,8 @@ void loop() {
         #ifdef SerialOutput
           Serial.print("Pericurr ");
           Serial.println(PeriCurrent);
+          Serial.print("PeriVoltage ");
+          Serial.println(PeriVoltage);
         #endif
       }
     }
@@ -689,7 +693,7 @@ void loop() {
       //busvoltage2 = INACHARGE.getBusVoltage_V();
       //shuntvoltage2 = INACHARGE.getShuntVoltage_mV();
       ChargeCurrent = INACHARGE.getCurrent_mA();
-
+      ChargeVoltage = INACHARGE.getBusVoltage_V() + INACHARGE.getShuntVoltage_V();
       if (ChargeCurrent <= 5) ChargeCurrent = 0;
       // loadvoltage2 = busvoltage2 + (shuntvoltage2 / 1000);
 
@@ -700,8 +704,10 @@ void loop() {
         u8x8.print(ChargeCurrent);
       #endif
       #ifdef SerialOutput
-        Serial.print("Charcurr ");
+        Serial.print("Charcurr: ");
         Serial.println(ChargeCurrent);
+      Serial.print("ChargeVolt: ");
+      Serial.println(ChargeVoltage);
       #endif
 
       if (ChargeCurrent > 5) {  //mower is into the station ,in my test 410 ma are drained so possible to stop sender
@@ -883,22 +889,27 @@ void loop() {
 
     if (req.indexOf("GET /?") != -1) {
       String sResponse, sHeader;
-      sResponse = "MAC ADRESS = ";
+      sResponse = "<html><head><title>Teensymower</title></head><body><H3>MAC ADRESS = ";
       sResponse += WiFi.macAddress();
-      sResponse += " WORKING DURATION= ";
+      sResponse += "<BR>WORKING DURATION= ";
       sResponse += workTimeMins;
-      sResponse += " PERI CURRENT Milli Amps= ";
+      sResponse += "min.<br>PERI CURRENT= ";
       sResponse += PeriCurrent;
-      sResponse += " CHARGE CURRENT Milli Amps= ";
+      sResponse += "mA<br>PERI VOLTAGE=";
+      sResponse += PeriVoltage;
+      sResponse += "V<br>CHARGE CURRENT= ";
       sResponse += ChargeCurrent;
-      sResponse += " sigDuration= ";
+      sResponse += "mA<br>CHARGE VOLTAGE= ";
+      sResponse += ChargeVoltage;
+      sResponse += "V<br>sigDuration= ";
       sResponse += sigDuration;
-      sResponse += " sigCodeInUse= ";
+      sResponse += "ms<br>sigCodeInUse= ";
       sResponse += sigCodeInUse;
-      sResponse += " sender A : ";
+      sResponse += "<br>sender A : ";
       sResponse += enableSenderA;
-      sResponse += " sender B : ";
+      sResponse += "<br>sender B : ";
       sResponse += enableSenderB;
+      sResponse += "</H3></body></html>";
 
       #ifdef SerialOutput
         Serial.println(sResponse);
