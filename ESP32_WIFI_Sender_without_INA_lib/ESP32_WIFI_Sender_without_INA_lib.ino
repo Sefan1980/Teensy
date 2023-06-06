@@ -51,7 +51,7 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #endif
-//#include "INA226_WE.h"
+//SH #include "INA226_WE.h"
 #include <U8x8lib.h>  //Please install the library U8g2 from Oliver Kraus
 
 //********************* Display Settings **********************************
@@ -77,8 +77,11 @@ WiFiServer server(80);
 //********************* other **********************************
 int column = 2;                                         //used in function scanNetwork. It's for the Screen. (Print SSID for each network found)
 bool firstStart = true;
-INA226_WE INAPERI = INA226_WE(0x40);                    // without bridge
-INA226_WE INACHARGE = INA226_WE(0x44);                  // Bridge at A1 - VSS
+//SH INA226_WE INAPERI = INA226_WE(0x40);                    // without bridge
+//SH INA226_WE INACHARGE = INA226_WE(0x44);                  // Bridge at A1 - VSS
+int INAPERI = 0x40;
+int INACHARGE = 0x44;
+
 byte sigCodeInUse = 1;                                  // 1 is the original ardumower sigcode
 int sigDuration = 104;                                  // send the bits each 104 microsecond (Also possible 50)
 int8_t sigcode_norm[128];
@@ -94,15 +97,15 @@ unsigned long nextTimeInfo = 0;
 unsigned long nextTimeSec = 0;
 unsigned long nextTimeCheckButton = 0;
 int workTimeMins = 0;
+
 float PeriCurrent = 0.0;
-float PeriVoltage = 0.0;
+float PeriBusVoltage = 0.0;
+int PeriShuntVoltage = 0;
+float PeriShuntR = 0.1;
 float ChargeCurrent = 0.0;
-float ChargeVoltage = 0.0;
-// float busvoltage1 = 0.0;
-// float shuntvoltage2 = 0.0;
-// float busvoltage2 = 0.0;
-// float loadvoltage2 = 0.0;
-// float DcDcOutVoltage = 0.0;
+float ChargeBusVoltage = 0.0;
+int ChargeShuntVoltage = 0;
+float ChargeShuntR = 0.1;
 
 //*********************  Sigcode list *********************************************
 // must be multiple of 2 !
@@ -482,6 +485,30 @@ void StaticScreenParts() {
 }
 // END StaticScreenParts
 
+// INA PARTS
+
+static void writeRegister(int INA226_ADDR, byte reg, word value) {
+  Wire.beginTransmission(INA226_ADDR);
+  Wire.write(reg);
+  Wire.write((value >> 8) & 0xFF);
+  Wire.write(value & 0xFF);
+  Wire.endTransmission();
+}
+
+
+static word readRegister(int INA226_ADDR, byte reg) {
+  word res = 0x0000;
+  Wire.beginTransmission(INA226_ADDR);
+  Wire.write(reg);
+  if (Wire.endTransmission() == 0) {
+    if (Wire.requestFrom(INA226_ADDR, 2) >= 2) {
+      res  = Wire.read() * 256;
+      res += Wire.read();
+    }
+  }
+  return res;
+}
+
 //********************* SETUP **********************************
 void setup() {
   Serial.begin(115200);                           // Serial interface start
@@ -562,11 +589,17 @@ void setup() {
   #ifdef SerialOutput
     Serial.println("Measuring voltage and current using INA226 ...");
   #endif
+  writeRegister(INAPERI, 0x00, 0x127); //Write registry to INA
+  //writeRegister(INAPERI, 0x05, 0x82A);  //Write calibration to INA
   
-  INAPERI.init();
-  INACHARGE.init();
-  INAPERI.setResistorRange(0.1, 0.8);
-  INACHARGE.setResistorRange(0.1, 0.8);
+  writeRegister(INACHARGE, 0x00, 0x127); //Write registry to INA
+  //writeRegister(INACHARGE, 0x05, 0x82A);  //Write calibration to INA
+
+
+//SH  INAPERI.init();
+//SH  INACHARGE.init();
+//SH  INAPERI.setResistorRange(0.1, 0.8);
+//SH  INACHARGE.setResistorRange(0.1, 0.8);
 
 #ifdef OTAUpdates
  ArduinoOTA.onStart([]() {
@@ -602,9 +635,9 @@ void setup() {
 //********************* LOOP **********************************
 void loop() {
 
-#ifdef OTAUpdates
-  ArduinoOTA.handle();
-#endif
+  #ifdef OTAUpdates
+    ArduinoOTA.handle();
+  #endif
 
   if (millis() >= nextTimeControl) {
     nextTimeControl = millis() + 10000;  //after debug can set this to 10 secondes
@@ -615,12 +648,24 @@ void loop() {
 
     if (USE_PERI_CURRENT) {
 //      busvoltage1 = INAPERI.getBusVoltage_V();
-      PeriCurrent = INAPERI.getCurrent_mA();
+//      PeriCurrent = INAPERI.getCurrent_mA();
+  PeriBusVoltage = readRegister(INAPERI, 0x02) * 0.00125;
+  PeriShuntVoltage = readRegister(INAPERI, 0x01);
+  if (PeriShuntVoltage && 0x8000) {// eine negative Zahl? Dann 2er Komplement bilden
+    PeriShuntVoltage = ~PeriShuntVoltage; // alle Bits invertieren
+    PeriShuntVoltage += 1;         // 1 dazuzählen
+    PeriShuntVoltage *= -1 ;       // negativ machen
+  }
+
+  PeriCurrent = PeriShuntVoltage * 0.0000025 / PeriShuntR * 1000; // * LSB / R * 1000(mA)
+
+
+
       PeriCurrent = PeriCurrent - 100.0;                         //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
       
-      PeriCurrent = PeriCurrent * INACHARGE.getBusVoltage_V() / INAPERI.getBusVoltage_V();  // it's 3.2666 = 29.4/9.0 the power is read before the DC/DC converter so the current change according : 29.4V is the Power supply 9.0V is the DC/DC output voltage (Change according your setting)
+//SH      PeriCurrent = PeriCurrent * INACHARGE.getBusVoltage_V() / INAPERI.getBusVoltage_V();  // it's 3.2666 = 29.4/9.0 the power is read before the DC/DC converter so the current change according : 29.4V is the Power supply 9.0V is the DC/DC output voltage (Change according your setting)
       if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;
-      PeriVoltage = INAPERI.getBusVoltage_V() + INAPERI.getShuntVoltage_V();
+//SH      PeriVoltage = INAPERI.getBusVoltage_V() + INAPERI.getShuntVoltage_V();
       if ((enableSenderA) && (PeriCurrent < PERI_CURRENT_MIN)) {
         workTimeMins = 0;
         #ifdef Screen
@@ -644,7 +689,7 @@ void loop() {
           Serial.print("Pericurr ");
           Serial.println(PeriCurrent);
           Serial.print("PeriVoltage ");
-          Serial.println(PeriVoltage);
+          Serial.println(PeriBusVoltage);
         #endif
       }
     }
@@ -692,9 +737,22 @@ void loop() {
 
       //busvoltage2 = INACHARGE.getBusVoltage_V();
       //shuntvoltage2 = INACHARGE.getShuntVoltage_mV();
-      ChargeCurrent = INACHARGE.getCurrent_mA();
-      ChargeVoltage = INACHARGE.getBusVoltage_V() + INACHARGE.getShuntVoltage_V();
-      if (ChargeCurrent <= 5) ChargeCurrent = 0;
+//      ChargeCurrent = INACHARGE.getCurrent_mA();
+//      ChargeVoltage = INACHARGE.getBusVoltage_V() + INACHARGE.getShuntVoltage_V();
+  ChargeBusVoltage = readRegister(INACHARGE, 0x02) * 0.00125;
+  ChargeShuntVoltage = readRegister(INACHARGE, 0x01);
+  if (ChargeShuntVoltage && 0x8000) {// eine negative Zahl? Dann 2er Komplement bilden
+    ChargeShuntVoltage = ~ChargeShuntVoltage; // alle Bits invertieren
+    ChargeShuntVoltage += 1;         // 1 dazuzählen
+    ChargeShuntVoltage *= -1 ;       // negativ machen
+  }
+
+  ChargeCurrent = ChargeShuntVoltage * 0.0000025 / ChargeShuntR * 1000; // * LSB / R *1000(mA)
+
+
+
+
+//      if (ChargeCurrent <= 5) ChargeCurrent = 0;
       // loadvoltage2 = busvoltage2 + (shuntvoltage2 / 1000);
 
       #ifdef Screen
@@ -707,7 +765,7 @@ void loop() {
         Serial.print("Charcurr: ");
         Serial.println(ChargeCurrent);
       Serial.print("ChargeVolt: ");
-      Serial.println(ChargeVoltage);
+      Serial.println(ChargeBusVoltage);
       #endif
 
       if (ChargeCurrent > 5) {  //mower is into the station ,in my test 410 ma are drained so possible to stop sender
@@ -895,13 +953,17 @@ void loop() {
       sResponse += workTimeMins;
       sResponse += "min.<br>PERI CURRENT= ";
       sResponse += PeriCurrent;
-      sResponse += "mA<br>PERI VOLTAGE=";
-      sResponse += PeriVoltage;
-      sResponse += "V<br>CHARGE CURRENT= ";
+      sResponse += "mA<br>PERI BUS VOLTAGE= ";
+      sResponse += PeriBusVoltage;
+      sResponse += "V<br>PeriShuntVoltage= ";
+      sResponse += PeriShuntVoltage;
+      sResponse += "<br>CHARGE CURRENT= ";
       sResponse += ChargeCurrent;
       sResponse += "mA<br>CHARGE VOLTAGE= ";
-      sResponse += ChargeVoltage;
-      sResponse += "V<br>sigDuration= ";
+      sResponse += ChargeBusVoltage;
+      sResponse += "v<br>ChargeShuntVoltage= ";
+      sResponse += ChargeShuntVoltage;
+      sResponse += "<br>sigDuration= ";
       sResponse += sigDuration;
       sResponse += "ms<br>sigCodeInUse= ";
       sResponse += sigCodeInUse;
