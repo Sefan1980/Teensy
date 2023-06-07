@@ -51,7 +51,6 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #endif
-//SH #include "INA226_WE.h"
 #include <U8x8lib.h>  //Please install the library U8g2 from Oliver Kraus
 
 //********************* Display Settings **********************************
@@ -77,10 +76,8 @@ WiFiServer server(80);
 //********************* other **********************************
 int column = 2;                                         //used in function scanNetwork. It's for the Screen. (Print SSID for each network found)
 bool firstStart = true;
-//SH INA226_WE INAPERI = INA226_WE(0x40);                    // without bridge
-//SH INA226_WE INACHARGE = INA226_WE(0x44);                  // Bridge at A1 - VSS
-int INAPERI = 0x40;
-int INACHARGE = 0x44;
+int INAPERI = 0x40;                                     // without bridge
+int INACHARGE = 0x44;                                   // bridge between A1 - VSS
 
 byte sigCodeInUse = 1;                                  // 1 is the original ardumower sigcode
 int sigDuration = 104;                                  // send the bits each 104 microsecond (Also possible 50)
@@ -97,11 +94,10 @@ unsigned long nextTimeInfo = 0;
 unsigned long nextTimeSec = 0;
 unsigned long nextTimeCheckButton = 0;
 int workTimeMins = 0;
-
-float PeriCurrent = 0.0;
-float PeriBusVoltage = 0.0;
-int PeriShuntVoltage = 0;
-float PeriShuntR = 0.1;
+float PeriCurrent = 0.0;        // current is calculated, in mA
+float PeriBusVoltage = 0.0;     // voltage at the wire
+int PeriShuntVoltage = 0;       // voltage drop across the shunt
+float PeriShuntR = 0.1;         // shuntresistor in ohm
 float ChargeCurrent = 0.0;
 float ChargeBusVoltage = 0.0;
 int ChargeShuntVoltage = 0;
@@ -485,8 +481,8 @@ void StaticScreenParts() {
 }
 // END StaticScreenParts
 
-// INA PARTS
 
+//********************* INA PARTS **********************************
 static void writeRegister(int INA226_ADDR, byte reg, word value) {
   Wire.beginTransmission(INA226_ADDR);
   Wire.write(reg);
@@ -508,6 +504,8 @@ static word readRegister(int INA226_ADDR, byte reg) {
   }
   return res;
 }
+// INA PARTS
+
 
 //********************* SETUP **********************************
 void setup() {
@@ -575,31 +573,28 @@ void setup() {
     u8x8.print(VER);
     u8x8.setCursor(0, 3);  // Set cursor position, line 2 10th character
     u8x8.print("2 LOOPS");
-    delay(5000);
-    //u8x8.clearDisplay();
+    delay(3000);
   #endif
   #ifdef SerialOutput
     Serial.println("TEENSYMOWER");
     Serial.println("BB SENDER");
     Serial.println(VER);
     Serial.println("2 LOOPS");
-    delay(5000);
+    delay(3000);
   #endif
+
   //------------------------  current sensor parts  ----------------------------------------
   #ifdef SerialOutput
     Serial.println("Measuring voltage and current using INA226 ...");
   #endif
   writeRegister(INAPERI, 0x00, 0x127); //Write registry to INA
-  //writeRegister(INAPERI, 0x05, 0x82A);  //Write calibration to INA
+  writeRegister(INAPERI, 0x05, 0x82A);  //Write calibration to INA
   
   writeRegister(INACHARGE, 0x00, 0x127); //Write registry to INA
-  //writeRegister(INACHARGE, 0x05, 0x82A);  //Write calibration to INA
+  writeRegister(INACHARGE, 0x05, 0x82A);  //Write calibration to INA
 
 
-//SH  INAPERI.init();
-//SH  INACHARGE.init();
-//SH  INAPERI.setResistorRange(0.1, 0.8);
-//SH  INACHARGE.setResistorRange(0.1, 0.8);
+  //------------------------  ArduinoOTA  ----------------------------------------
 
 #ifdef OTAUpdates
  ArduinoOTA.onStart([]() {
@@ -647,25 +642,19 @@ void loop() {
   #endif
 
     if (USE_PERI_CURRENT) {
-//      busvoltage1 = INAPERI.getBusVoltage_V();
-//      PeriCurrent = INAPERI.getCurrent_mA();
   PeriBusVoltage = readRegister(INAPERI, 0x02) * 0.00125;
-  PeriShuntVoltage = readRegister(INAPERI, 0x01);
-  if (PeriShuntVoltage && 0x8000) {// eine negative Zahl? Dann 2er Komplement bilden
-    PeriShuntVoltage = ~PeriShuntVoltage; // alle Bits invertieren
-    PeriShuntVoltage += 1;         // 1 dazuzählen
-    PeriShuntVoltage *= -1 ;       // negativ machen
+  PeriShuntVoltage = readRegister(INAPERI, 0x01) * 0.0025;
+  if (PeriShuntVoltage && 0x8000) {                               // eine negative Zahl? Dann 2er Komplement bilden
+    PeriShuntVoltage = ~PeriShuntVoltage;                         // alle Bits invertieren
+    PeriShuntVoltage += 1;                                        // 1 dazuzählen
+    PeriShuntVoltage *= -1 ;                                      // negativ machen
   }
+  
+    PeriCurrent = readRegister(INAPERI, 0x04) * 0.0125;
+    PeriCurrent = PeriCurrent - 100.0;                        //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
 
-  PeriCurrent = PeriShuntVoltage * 0.0000025 / PeriShuntR * 1000; // * LSB / R * 1000(mA)
+    if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;
 
-
-
-      PeriCurrent = PeriCurrent - 100.0;                         //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
-      
-//SH      PeriCurrent = PeriCurrent * INACHARGE.getBusVoltage_V() / INAPERI.getBusVoltage_V();  // it's 3.2666 = 29.4/9.0 the power is read before the DC/DC converter so the current change according : 29.4V is the Power supply 9.0V is the DC/DC output voltage (Change according your setting)
-      if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;
-//SH      PeriVoltage = INAPERI.getBusVoltage_V() + INAPERI.getShuntVoltage_V();
       if ((enableSenderA) && (PeriCurrent < PERI_CURRENT_MIN)) {
         workTimeMins = 0;
         #ifdef Screen
@@ -735,25 +724,16 @@ void loop() {
 
     if (USE_STATION) {
 
-      //busvoltage2 = INACHARGE.getBusVoltage_V();
-      //shuntvoltage2 = INACHARGE.getShuntVoltage_mV();
-//      ChargeCurrent = INACHARGE.getCurrent_mA();
-//      ChargeVoltage = INACHARGE.getBusVoltage_V() + INACHARGE.getShuntVoltage_V();
   ChargeBusVoltage = readRegister(INACHARGE, 0x02) * 0.00125;
-  ChargeShuntVoltage = readRegister(INACHARGE, 0x01);
+  ChargeShuntVoltage = readRegister(INACHARGE, 0x01) * 0.0025;
   if (ChargeShuntVoltage && 0x8000) {// eine negative Zahl? Dann 2er Komplement bilden
     ChargeShuntVoltage = ~ChargeShuntVoltage; // alle Bits invertieren
     ChargeShuntVoltage += 1;         // 1 dazuzählen
     ChargeShuntVoltage *= -1 ;       // negativ machen
   }
 
-  ChargeCurrent = ChargeShuntVoltage * 0.0000025 / ChargeShuntR * 1000; // * LSB / R *1000(mA)
-
-
-
-
-//      if (ChargeCurrent <= 5) ChargeCurrent = 0;
-      // loadvoltage2 = busvoltage2 + (shuntvoltage2 / 1000);
+  ChargeCurrent = readRegister(INACHARGE, 0x04) * 0.0125;
+      if (ChargeCurrent <= 5) ChargeCurrent = 0;
 
       #ifdef Screen
         u8x8.setCursor(10, 6);
@@ -785,13 +765,11 @@ void loop() {
         if (AUTO_START_SIGNAL) {
           //always start to send a signal when mower leave station
           if (!enableSenderB) {
-            //workTimeMins = 0;       // Wortkime is always 0... That's a fault!
             enableSenderA = true;
             digitalWrite(pinEnableA, HIGH);
             digitalWrite(pinIN1, LOW);
             digitalWrite(pinIN2, LOW);
           } else {
-            //workTimeMins = 0;
             enableSenderB = true;
             digitalWrite(pinEnableB, HIGH);
             digitalWrite(pinIN3, LOW);
@@ -947,7 +925,7 @@ void loop() {
 
     if (req.indexOf("GET /?") != -1) {
       String sResponse, sHeader;
-      sResponse = "<html><head><title>Teensymower</title></head><body><H3>MAC ADRESS = ";
+      sResponse = "<html><head><title>Teensymower</title><META HTTP-EQUIV='refresh' CONTENT='5'></head><body><H3>MAC ADRESS = ";
       sResponse += WiFi.macAddress();
       sResponse += "<BR>WORKING DURATION= ";
       sResponse += workTimeMins;
@@ -957,13 +935,13 @@ void loop() {
       sResponse += PeriBusVoltage;
       sResponse += "V<br>PeriShuntVoltage= ";
       sResponse += PeriShuntVoltage;
-      sResponse += "<br>CHARGE CURRENT= ";
+      sResponse += "mV<br>CHARGE CURRENT= ";
       sResponse += ChargeCurrent;
       sResponse += "mA<br>CHARGE VOLTAGE= ";
       sResponse += ChargeBusVoltage;
       sResponse += "v<br>ChargeShuntVoltage= ";
       sResponse += ChargeShuntVoltage;
-      sResponse += "<br>sigDuration= ";
+      sResponse += "mV<br>sigDuration= ";
       sResponse += sigDuration;
       sResponse += "ms<br>sigCodeInUse= ";
       sResponse += sigCodeInUse;
