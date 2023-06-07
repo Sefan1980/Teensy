@@ -637,23 +637,22 @@ void loop() {
   if (millis() >= nextTimeControl) {
     nextTimeControl = millis() + 10000;  //after debug can set this to 10 secondes
 
-  #ifdef Screen
-    StaticScreenParts();
-  #endif
+    #ifdef Screen
+      StaticScreenParts();
+    #endif
 
     if (USE_PERI_CURRENT) {
-  PeriBusVoltage = readRegister(INAPERI, 0x02) * 0.00125;
-  PeriShuntVoltage = readRegister(INAPERI, 0x01) * 0.0025;
-  if (PeriShuntVoltage && 0x8000) {                               // eine negative Zahl? Dann 2er Komplement bilden
-    PeriShuntVoltage = ~PeriShuntVoltage;                         // alle Bits invertieren
-    PeriShuntVoltage += 1;                                        // 1 dazuzählen
-    PeriShuntVoltage *= -1 ;                                      // negativ machen
-  }
-  
-    PeriCurrent = readRegister(INAPERI, 0x04) * 0.0125;
-    PeriCurrent = PeriCurrent - 100.0;                        //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
+      PeriBusVoltage = (readRegister(INAPERI, 0x02) * 1.25) / 1000;
+      PeriShuntVoltage = readRegister(INAPERI, 0x01) * 0.0025;
+      if (PeriShuntVoltage && 0x8000) {                               // eine negative Zahl? Dann 2er Komplement bilden
+        PeriShuntVoltage = ~PeriShuntVoltage;                         // alle Bits invertieren
+        PeriShuntVoltage += 1;                                        // 1 dazuzählen
+        PeriShuntVoltage *= -1 ;                                      // negativ machen
+      }
+      PeriCurrent = readRegister(INAPERI, 0x04) * 0.02441;
+      PeriCurrent = PeriCurrent - 75.0;                        //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
 
-    if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;
+      if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;
 
       if ((enableSenderA) && (PeriCurrent < PERI_CURRENT_MIN)) {
         workTimeMins = 0;
@@ -724,15 +723,14 @@ void loop() {
 
     if (USE_STATION) {
 
-  ChargeBusVoltage = readRegister(INACHARGE, 0x02) * 0.00125;
-  ChargeShuntVoltage = readRegister(INACHARGE, 0x01) * 0.0025;
-  if (ChargeShuntVoltage && 0x8000) {// eine negative Zahl? Dann 2er Komplement bilden
-    ChargeShuntVoltage = ~ChargeShuntVoltage; // alle Bits invertieren
-    ChargeShuntVoltage += 1;         // 1 dazuzählen
-    ChargeShuntVoltage *= -1 ;       // negativ machen
-  }
-
-  ChargeCurrent = readRegister(INACHARGE, 0x04) * 0.0125;
+      ChargeBusVoltage = (readRegister(INACHARGE, 0x02) * 1.25) / 1000;
+      ChargeShuntVoltage = readRegister(INACHARGE, 0x01) * 0.0025;
+      if (ChargeShuntVoltage && 0x8000) {// eine negative Zahl? Dann 2er Komplement bilden
+        ChargeShuntVoltage = ~ChargeShuntVoltage; // alle Bits invertieren
+        ChargeShuntVoltage += 1;         // 1 dazuzählen
+        ChargeShuntVoltage *= -1 ;       // negativ machen
+      }
+      ChargeCurrent = readRegister(INACHARGE, 0x04) * 0.02441;
       if (ChargeCurrent <= 5) ChargeCurrent = 0;
 
       #ifdef Screen
