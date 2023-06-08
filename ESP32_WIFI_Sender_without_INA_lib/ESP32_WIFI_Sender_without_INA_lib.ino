@@ -651,7 +651,7 @@ void loop() {
         PeriShuntVoltage += 1;                                        // 1 dazuzählen
         PeriShuntVoltage *= -1 ;                                      // negativ machen
       }
-      PeriCurrent = readRegister(INAPERI, 0x04) * 0.02441;
+      PeriCurrent = readRegister(INAPERI, 0x04) / 40.9668;
       PeriCurrent = PeriCurrent - 75.0;                        //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
 
       if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;
@@ -733,7 +733,8 @@ void loop() {
         ChargeShuntVoltage += 1;         // 1 dazuzählen
         ChargeShuntVoltage *= -1 ;       // negativ machen
       }
-      ChargeCurrent = readRegister(INACHARGE, 0x04) * 0.02441;
+      ChargeCurrent = readRegister(INACHARGE, 0x04) / 40.9668;
+
       //ChargeCurrent = ChargeCurrent - 100;          // Don't ask me why... 
       if (ChargeCurrent <= 5) ChargeCurrent = 0;
 
