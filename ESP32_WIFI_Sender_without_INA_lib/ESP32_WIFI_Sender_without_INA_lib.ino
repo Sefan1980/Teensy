@@ -726,8 +726,7 @@ void loop() {
     if (USE_STATION) {
 
       ChargeBusVoltage = (readRegister(INACHARGE, 0x02) * 1.25) / 1000;
-//      ChargeShuntVoltage = readRegister(INACHARGE, 0x01) * 0.0025;
-      ChargeShuntVoltage = readRegister(INACHARGE, 0x01);
+      ChargeShuntVoltage = readRegister(INACHARGE, 0x01) * 0.0025;
   
       if (ChargeShuntVoltage && 0x8000) {// eine negative Zahl? Dann 2er Komplement bilden
         ChargeShuntVoltage = ~ChargeShuntVoltage; // alle Bits invertieren
