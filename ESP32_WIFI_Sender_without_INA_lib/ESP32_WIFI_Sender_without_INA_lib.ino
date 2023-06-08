@@ -733,7 +733,7 @@ void loop() {
         ChargeShuntVoltage += 1;         // 1 dazuzählen
         ChargeShuntVoltage *= -1 ;       // negativ machen
       }
-      ChargeCurrent = readRegister(INACHARGE, 0x04);
+      ChargeCurrent = readRegister(INACHARGE, 0x04) * 0.02441;
       //ChargeCurrent = ChargeCurrent - 100;          // Don't ask me why... 
       if (ChargeCurrent <= 5) ChargeCurrent = 0;
 
