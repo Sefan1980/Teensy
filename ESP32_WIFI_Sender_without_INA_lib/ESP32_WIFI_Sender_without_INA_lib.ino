@@ -47,9 +47,9 @@
 #include <Wire.h>
 #include <WiFi.h>
 #ifdef OTAUpdates
-#include <ESPmDNS.h>
-#include <WiFiUdp.h>
-#include <ArduinoOTA.h>
+  #include <ESPmDNS.h>
+  #include <WiFiUdp.h>
+  #include <ArduinoOTA.h>
 #endif
 #include <U8x8lib.h>  //Please install the library U8g2 from Oliver Kraus
 
@@ -489,6 +489,7 @@ static void writeRegister(int INA226_ADDR, byte reg, word value) {
   Wire.write((value >> 8) & 0xFF);
   Wire.write(value & 0xFF);
   Wire.endTransmission();
+
 }
 
 
@@ -510,7 +511,7 @@ static word readRegister(int INA226_ADDR, byte reg) {
 //********************* SETUP **********************************
 void setup() {
   Serial.begin(115200);                           // Serial interface start
-  Wire.begin();                                   // I2C interface start
+  Wire.begin(I2C_SDA, I2C_SCL);                   // I2C interface start
   u8x8.begin();                                   // Screen start
   u8x8.setFont(u8x8_font_5x8_f);                  // Screen font 
   u8x8.clear();
@@ -588,11 +589,12 @@ void setup() {
     Serial.println("Measuring voltage and current using INA226 ...");
   #endif
   writeRegister(INAPERI, 0x00, 0x127); //Write registry to INA
-  writeRegister(INAPERI, 0x05, 0x82A);  //Write calibration to INA
-  
+  delay(100);
+  writeRegister(INAPERI, 0x05, 0x855);  //Write calibration to INA
+  delay(100);
   writeRegister(INACHARGE, 0x00, 0x127); //Write registry to INA
-  writeRegister(INACHARGE, 0x05, 0x82A);  //Write calibration to INA
-
+  delay(100);
+  writeRegister(INACHARGE, 0x05, 0x855);  //Write calibration to INA
 
   //------------------------  ArduinoOTA  ----------------------------------------
 
@@ -724,13 +726,16 @@ void loop() {
     if (USE_STATION) {
 
       ChargeBusVoltage = (readRegister(INACHARGE, 0x02) * 1.25) / 1000;
-      ChargeShuntVoltage = readRegister(INACHARGE, 0x01) * 0.0025;
+//      ChargeShuntVoltage = readRegister(INACHARGE, 0x01) * 0.0025;
+      ChargeShuntVoltage = readRegister(INACHARGE, 0x01);
+  
       if (ChargeShuntVoltage && 0x8000) {// eine negative Zahl? Dann 2er Komplement bilden
         ChargeShuntVoltage = ~ChargeShuntVoltage; // alle Bits invertieren
         ChargeShuntVoltage += 1;         // 1 dazuzählen
         ChargeShuntVoltage *= -1 ;       // negativ machen
       }
-      ChargeCurrent = readRegister(INACHARGE, 0x04) * 0.02441;
+      ChargeCurrent = readRegister(INACHARGE, 0x04);
+      //ChargeCurrent = ChargeCurrent - 100;          // Don't ask me why... 
       if (ChargeCurrent <= 5) ChargeCurrent = 0;
 
       #ifdef Screen
@@ -929,17 +934,23 @@ void loop() {
       sResponse += workTimeMins;
       sResponse += "min.<br>PERI CURRENT= ";
       sResponse += PeriCurrent;
-      sResponse += "mA<br>PERI BUS VOLTAGE= ";
+      sResponse += "mA<br>PERI VOLTAGE= ";
       sResponse += PeriBusVoltage;
-      sResponse += "V<br>PeriShuntVoltage= ";
-      sResponse += PeriShuntVoltage;
-      sResponse += "mV<br>CHARGE CURRENT= ";
+
+      // sResponse += "V<br>PeriShuntVoltage= ";      // Shows the PeriShuntVoltage
+      // sResponse += PeriShuntVoltage;
+      // sResponse += "m";
+
+      sResponse += "V<br>CHARGE CURRENT= ";
       sResponse += ChargeCurrent;
       sResponse += "mA<br>CHARGE VOLTAGE= ";
       sResponse += ChargeBusVoltage;
-      sResponse += "v<br>ChargeShuntVoltage= ";
+
+      sResponse += "v<br>ChargeShuntVoltage= ";      // Shows the ChargeShuntVoltage
       sResponse += ChargeShuntVoltage;
-      sResponse += "mV<br>sigDuration= ";
+      sResponse += "m";
+
+      sResponse += "V<br>sigDuration= ";
       sResponse += sigDuration;
       sResponse += "ms<br>sigCodeInUse= ";
       sResponse += sigCodeInUse;
