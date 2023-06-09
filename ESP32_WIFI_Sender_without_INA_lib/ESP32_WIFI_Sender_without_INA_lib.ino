@@ -733,10 +733,10 @@ void loop() {
         ChargeShuntVoltage += 1;         // 1 dazuzählen
         ChargeShuntVoltage *= -1 ;       // negativ machen
       }
-      ChargeCurrent = readRegister(INACHARGE, 0x04) / 40.9668;
+      ChargeCurrent = readRegister(INACHARGE, 0x04) / 40.9668  //
 
       //ChargeCurrent = ChargeCurrent - 100;          // Don't ask me why... 
-      if (ChargeCurrent <= 5) ChargeCurrent = 0;
+    //  if (ChargeCurrent < 5) ChargeCurrent = 0;
 
       #ifdef Screen
         u8x8.setCursor(10, 6);
