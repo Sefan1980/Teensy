@@ -94,11 +94,12 @@ unsigned long nextTimeInfo = 0;
 unsigned long nextTimeSec = 0;
 unsigned long nextTimeCheckButton = 0;
 int workTimeMins = 0;
-float PeriCurrent = 0.0;        // current is calculated, in mA
+float PeriCurrent = 0.0;        // in mA
 float PeriBusVoltage = 0.0;     // voltage at the wire
 int PeriShuntVoltage = 0;       // voltage drop across the shunt
 float PeriShuntR = 0.1;         // shuntresistor in ohm
 float ChargeCurrent = 0.0;
+float ChargeCurrentPrint = 0.0;
 float ChargeBusVoltage = 0.0;
 int ChargeShuntVoltage = 0;
 float ChargeShuntR = 0.1;
@@ -651,7 +652,7 @@ void loop() {
         PeriShuntVoltage += 1;                                        // 1 dazuzählen
         PeriShuntVoltage *= -1 ;                                      // negativ machen
       }
-      PeriCurrent = readRegister(INAPERI, 0x04) / 40.9668;
+      PeriCurrent = readRegister(INAPERI, 0x04) / 40.9668;          // Divider is configurable
       PeriCurrent = PeriCurrent - 75.0;                        //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
 
       if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;
@@ -733,20 +734,19 @@ void loop() {
         ChargeShuntVoltage += 1;         // 1 dazuzählen
         ChargeShuntVoltage *= -1 ;       // negativ machen
       }
-      ChargeCurrent = readRegister(INACHARGE, 0x04) / 40.9668  //
-
-      //ChargeCurrent = ChargeCurrent - 100;          // Don't ask me why... 
-    //  if (ChargeCurrent < 5) ChargeCurrent = 0;
+      ChargeCurrent = readRegister(INACHARGE, 0x04) / 40.9668;
+      ChargeCurrentPrint=ChargeCurrent;                         // just a var to print on the screen
+      if (ChargeCurrent < 10) ChargeCurrentPrint = 0;           // shows 0 when the mower is not charging
 
       #ifdef Screen
         u8x8.setCursor(10, 6);
         u8x8.print("      ");
         u8x8.setCursor(10, 6);
-        u8x8.print(ChargeCurrent);
+        u8x8.print(ChargeCurrentPrint);
       #endif
       #ifdef SerialOutput
         Serial.print("Charcurr: ");
-        Serial.println(ChargeCurrent);
+        Serial.println(ChargeCurrentPrint);
       Serial.print("ChargeVolt: ");
       Serial.println(ChargeBusVoltage);
       #endif
@@ -928,35 +928,35 @@ void loop() {
 
     if (req.indexOf("GET /?") != -1) {
       String sResponse, sHeader;
-      sResponse = "<html><head><title>Teensymower</title><META HTTP-EQUIV='refresh' CONTENT='5'></head><body><H3>MAC ADRESS = ";
+      sResponse = "<html><head><title>TeensySender</title><META HTTP-EQUIV='refresh' CONTENT='5'></head><body><H3>MAC ADRESS = ";
       sResponse += WiFi.macAddress();
-      sResponse += "<BR>WORKING DURATION= ";
+      sResponse += "<BR>Betriebszeit der Perimeterschleife = ";
       sResponse += workTimeMins;
-      sResponse += "min.<br>PERI CURRENT= ";
+      sResponse += "min.<br>Stromfluss in der Perimeterschleife = ";
       sResponse += PeriCurrent;
-      sResponse += "mA<br>PERI VOLTAGE= ";
+      sResponse += "mA<br>Spannung in der Perimeterschleife = ";
       sResponse += PeriBusVoltage;
 
       // sResponse += "V<br>PeriShuntVoltage= ";      // Shows the PeriShuntVoltage
       // sResponse += PeriShuntVoltage;
       // sResponse += "m";
 
-      sResponse += "V<br>CHARGE CURRENT= ";
-      sResponse += ChargeCurrent;
-      sResponse += "mA<br>CHARGE VOLTAGE= ";
+      sResponse += "V<br>Ladestrom = ";
+      sResponse += ChargeCurrentPrint;
+      sResponse += "mA<br>Ladespannung = ";
       sResponse += ChargeBusVoltage;
 
-      sResponse += "v<br>ChargeShuntVoltage= ";      // Shows the ChargeShuntVoltage
-      sResponse += ChargeShuntVoltage;
-      sResponse += "m";
+      // sResponse += "V<br>ChargeShuntVoltage= ";      // Shows the ChargeShuntVoltage
+      // sResponse += ChargeShuntVoltage;
+      // sResponse += "m";
 
-      sResponse += "V<br>sigDuration= ";
+      sResponse += "V<br>Signaldauer = ";
       sResponse += sigDuration;
-      sResponse += "ms<br>sigCodeInUse= ";
+      sResponse += "ms<br>Signalcode = ";
       sResponse += sigCodeInUse;
-      sResponse += "<br>sender A : ";
+      sResponse += "<br>Sender A : ";
       sResponse += enableSenderA;
-      sResponse += "<br>sender B : ";
+      sResponse += "<br>Sender B : ";
       sResponse += enableSenderB;
       sResponse += "</H3></body></html>";
 
