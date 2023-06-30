@@ -14,7 +14,7 @@
 
   If USE_STATION : the sender start and stop automaticly if the mower is in the station or not
 
-  ------VERSION VON STEFAN------
+  
 */
 
 //********************* defines **********************************
