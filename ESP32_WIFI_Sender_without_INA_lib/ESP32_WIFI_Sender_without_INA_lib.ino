@@ -14,7 +14,7 @@
 
   If USE_STATION : the sender start and stop automaticly if the mower is in the station or not
 
-  ------VERSION VON STEFAN------
+  ------COLLABORATION FROM BERNARD, SASCHA AND STEFAN------
 */
 
 //********************* defines **********************************
@@ -22,13 +22,13 @@
 #define USE_STATION 1             // a station is connected and is used to charge the mower
 #define USE_PERI_CURRENT 1        // use Feedback for perimeter current measurements? (set to '0' if not connected!)
 #define USE_BUTTON 0              // use button to start mowing or send mower to station not finish to dev
-//#define USE_RAINFLOW 0            // check the amount of rain not finish to dev on 31/08/2020
+//#define USE_RAINFLOW 0          // check the amount of rain not finish to dev on 31/08/2020
 #define WORKING_TIMEOUT_MINS 300  // timeout for perimeter switch-off if robot not in station (minutes)
 #define PERI_CURRENT_MIN 200      // minimum milliAmpere for cutting wire detection
 #define AUTO_START_SIGNAL 1       // use to start sender when mower leave station
 #define I2C_SDA 21                // SDA pin
 #define I2C_SCL 22                // SCL pin
-//#define SerialOutput 1          // Show Serial Textmessages for debugging
+#define SerialOutput 1            // Show Serial Textmessages for debugging
 #define Screen 1                  // Screen or not?
 #define pinIN1 12                 // M1_IN1  ESP32 GPIO12       ( connect this pin to L298N-IN1)
 #define pinIN2 13                 // M1_IN2  ESP32 GPIO13       ( connect this pin to L298N-IN2)
@@ -41,11 +41,13 @@
 #define pinLDR 32                 // Not in use (Light Sensor)
 #define pinGreenLED 25            // Not in use
 #define pinRedLED 26              // Not in use
-#define VER "ESP32 3.0"           // code version
+#define VER "ESP32Sender 5.0"     // code version
 
 //********************* includes **********************************
 #include <Wire.h>
 #include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiAP.h>
 #ifdef OTAUpdates
   #include <ESPmDNS.h>
   #include <WiFiUdp.h>
@@ -65,19 +67,20 @@ U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 // End of constructor list
 
 //********************* WLAN Settings **********************************
-const char* ssid = "Sefan WLAN 2,4GHz";          // put here your acces point ssid
-const char* password = "StefanJaninaRenkaDeik";  // put here the password
-IPAddress staticIP(192,168,178,222);  // put here the static IP
-IPAddress gateway(192,168,178,1);     // put here the gateway (IP of your routeur)
+const char* ssid = "TeensySender";        // put here your acces point ssid -->  If you use the station an an Accesspoint, put the SSID for your AP here. The SSID for AP should not match an existing network.
+const char* password = "password123";     // put here the password - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password here.
+IPAddress staticIP(192, 168, 178, 222);   // put here the static IP --> Used for AP too!
+IPAddress gateway(192, 168, 178, 1);      // put here the gateway (IP of your router)
 IPAddress subnet(255, 255, 255, 0);
-IPAddress dns(192,168,178,1);  // put here one dns (IP of your routeur)
+IPAddress dns(192, 168, 178, 1);          // put here the dns (IP of your router)
 WiFiServer server(80);
+bool APconnected = false;
 
 //********************* other **********************************
 int column = 2;                                         //used in function scanNetwork. It's for the Screen. (Print SSID for each network found)
 bool firstStart = true;
 int INAPERI = 0x40;                                     // without bridge
-int INACHARGE = 0x44;                                   // bridge between A1 - VSS
+int INACHARGE = 0x44;                                   // bridge between A1 and VSS
 
 byte sigCodeInUse = 1;                                  // 1 is the original ardumower sigcode
 int sigDuration = 104;                                  // send the bits each 104 microsecond (Also possible 50)
@@ -261,7 +264,7 @@ void changeArea(byte areaInMowing) {  // not finish to dev
     u8x8.setCursor(0,4);
     u8x8.print("sigcode size:");
     u8x8.print(sigcode_size);
-    delay(5000);
+    delay(2000);
   #endif
 }
 // END ChangeArea
@@ -321,6 +324,46 @@ void connection() {
 }
 // END Connection
 
+//TEST FOR AP
+//********************* openAP **********************************
+static void openAP()  {
+
+  WiFi.softAPConfig (staticIP, gateway, subnet);
+  if (!WiFi.softAP(ssid, password)) {
+    Serial.println("AP creation failed.");
+    while(1);
+  }
+  IPAddress myIP = WiFi.softAPIP();
+  
+  #ifdef SerialOutput
+  Serial.print("AP IP address: ");
+  Serial.println(myIP);
+  #endif
+
+  #ifdef Screen
+    u8x8.clear();
+    u8x8.setCursor(0, 1);
+    u8x8.print("AP-IP-addr:");
+    u8x8.setCursor(0, 3);
+    u8x8.print(myIP);
+  #endif
+
+  server.begin();
+  
+  #ifdef SerialOutput
+    Serial.println("Server started");
+  #endif
+
+  #ifdef Screen
+  u8x8.setCursor(0, 5);
+  u8x8.print("Server started");
+  #endif
+  APconnected = true;
+  delay(3000);
+}  
+// END openAP
+
+
 //********************* SCANNETWORK **********************************
 static void ScanNetwork() {
 
@@ -359,7 +402,7 @@ static void ScanNetwork() {
       Serial.println("If sender is OFF");
     #endif
         
-    delay(5000);
+    delay(3000);
     if ((!enableSenderA) && (!enableSenderB)) ESP.restart();  // do not reset if sender is ON
   }
   if (n == -2)    //bug in esp32 if wifi is lost many time the esp32 fail to autoreconnect,maybe solve in other firmware ???????
@@ -379,7 +422,7 @@ static void ScanNetwork() {
       Serial.println("If sender is OFF");
     #endif
         
-    delay(5000);
+    delay(3000);
     if ((!enableSenderA) && (!enableSenderB)) ESP.restart();
   }
   if (n == 0) {
@@ -438,7 +481,14 @@ static void ScanNetwork() {
       }
     }
     delay(5000);
-    if (findNetwork = true) connection();
+    if (findNetwork == true)  {
+      connection();
+    }
+
+//TEST FOR AP
+    else  {
+      openAP();
+    }
   }
 }
 // END ScanNetwork
@@ -685,7 +735,9 @@ void loop() {
       }
     }
 
-    if ((WiFi.status() != WL_CONNECTED)) ScanNetwork();
+    //TEST FOR AP
+    if ((WiFi.status() != WL_CONNECTED && APconnected == false)) ScanNetwork();
+
     if (workTimeMins >= WORKING_TIMEOUT_MINS) {
       // switch off perimeter
       enableSenderA = false;
