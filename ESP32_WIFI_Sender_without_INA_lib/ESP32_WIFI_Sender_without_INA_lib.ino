@@ -65,8 +65,8 @@ U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 // End of constructor list
 
 //********************* WLAN Settings **********************************
-const char* ssid = "Sefan WLAN 2,4GHz";          // put here your acces point ssid
-const char* password = "StefanJaninaRenkaDeik";  // put here the password
+const char* ssid = "WLAN 2,4GHz";          // put here your acces point ssid
+const char* password = "password";  // put here the password
 IPAddress staticIP(192,168,178,222);  // put here the static IP
 IPAddress gateway(192,168,178,1);     // put here the gateway (IP of your routeur)
 IPAddress subnet(255, 255, 255, 0);
