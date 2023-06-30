@@ -48,6 +48,7 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WiFiAP.h>
+#include <INA226_WE.h>
 #ifdef OTAUpdates
   #include <ESPmDNS.h>
   #include <WiFiUdp.h>
@@ -79,8 +80,13 @@ bool APconnected = false;
 //********************* other **********************************
 int column = 2;                                         //used in function scanNetwork. It's for the Screen. (Print SSID for each network found)
 bool firstStart = true;
+/*
 int INAPERI = 0x40;                                     // without bridge
 int INACHARGE = 0x44;                                   // bridge between A1 and VSS
+*/
+
+INA226_WE InaPeri = INA226_WE(0x40);
+INA226_WE InaCharge = INA226_WE(0x44);
 
 byte sigCodeInUse = 1;                                  // 1 is the original ardumower sigcode
 int sigDuration = 104;                                  // send the bits each 104 microsecond (Also possible 50)
@@ -563,6 +569,10 @@ static word readRegister(int INA226_ADDR, byte reg) {
 void setup() {
   Serial.begin(115200);                           // Serial interface start
   Wire.begin(I2C_SDA, I2C_SCL);                   // I2C interface start
+
+  InaPeri.init();
+  InaCharge.init();
+
   u8x8.begin();                                   // Screen start
   u8x8.setFont(u8x8_font_5x8_f);                  // Screen font 
   u8x8.clear();
@@ -639,6 +649,8 @@ void setup() {
   #ifdef SerialOutput
     Serial.println("Measuring voltage and current using INA226 ...");
   #endif
+  
+  /*
   writeRegister(INAPERI, 0x00, 0x127); //Write registry to INA
   delay(100);
   writeRegister(INAPERI, 0x05, 0x855);  //Write calibration to INA
@@ -646,6 +658,14 @@ void setup() {
   writeRegister(INACHARGE, 0x00, 0x127); //Write registry to INA
   delay(100);
   writeRegister(INACHARGE, 0x05, 0x855);  //Write calibration to INA
+  */
+
+  InaPeri.setAverage(AVERAGE_4);
+  InaPeri.setResistorRange(0.2, 4);
+//  InaPeri.waitUntilConversionCompleted();
+  InaCharge.setAverage(AVERAGE_4);
+  InaCharge.setResistorRange(0.2, 4);
+//  InaCharge.waitUntilConversionCompleted();
 
   //------------------------  ArduinoOTA  ----------------------------------------
 
@@ -694,7 +714,10 @@ void loop() {
       StaticScreenParts();
     #endif
 
+  
     if (USE_PERI_CURRENT) {
+    
+      /*
       PeriBusVoltage = (readRegister(INAPERI, 0x02) * 1.25) / 1000;
       PeriShuntVoltage = readRegister(INAPERI, 0x01) * 0.0025;
       if (PeriShuntVoltage && 0x8000) {                               // eine negative Zahl? Dann 2er Komplement bilden
@@ -703,6 +726,12 @@ void loop() {
         PeriShuntVoltage *= -1 ;                                      // negativ machen
       }
       PeriCurrent = readRegister(INAPERI, 0x04) / 40.9668;          // Divider is configurable
+      */
+
+      PeriBusVoltage = InaPeri.getBusVoltage_V();
+      PeriShuntVoltage = InaPeri.getShuntVoltage_mV();
+      PeriCurrent = InaPeri.getCurrent_mA();
+
       PeriCurrent = PeriCurrent - 75.0;                        //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
 
       if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;
@@ -778,6 +807,7 @@ void loop() {
 
     if (USE_STATION) {
 
+      /*
       ChargeBusVoltage = (readRegister(INACHARGE, 0x02) * 1.25) / 1000;
       ChargeShuntVoltage = readRegister(INACHARGE, 0x01) * 0.0025;
   
@@ -787,7 +817,13 @@ void loop() {
         ChargeShuntVoltage *= -1 ;       // negativ machen
       }
       ChargeCurrent = readRegister(INACHARGE, 0x04) / 40.9668;
-      ChargeCurrentPrint=ChargeCurrent;                         // just a var to print on the screen
+      */
+
+      ChargeBusVoltage = InaCharge.getBusVoltage_V();
+      ChargeShuntVoltage = InaCharge.getShuntVoltage_mV();
+      ChargeCurrent = InaCharge.getCurrent_mA();
+
+      ChargeCurrentPrint = ChargeCurrent;                       // just a var to print on the screen
       if (ChargeCurrent < 10) ChargeCurrentPrint = 0;           // shows 0 when the mower is not charging
 
       #ifdef Screen
