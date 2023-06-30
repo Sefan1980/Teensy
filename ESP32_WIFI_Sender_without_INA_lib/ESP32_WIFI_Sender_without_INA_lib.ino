@@ -68,8 +68,8 @@ U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 // End of constructor list
 
 //********************* WLAN Settings **********************************
-const char* ssid = "TeensySender";        // put here your acces point ssid -->  If you use the station an an Accesspoint, put the SSID for your AP here. The SSID for AP should not match an existing network.
-const char* password = "password123";     // put here the password - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password here.
+const char* ssid = "Sefan WLAN 2,4GHz";        // put here your acces point ssid -->  If you use the station an an Accesspoint, put the SSID for your AP here. The SSID for AP should not match an existing network.
+const char* password = "StefanJaninaRenkaDeik";     // put here the password - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password here.
 IPAddress staticIP(192, 168, 178, 222);   // put here the static IP --> Used for AP too!
 IPAddress gateway(192, 168, 178, 1);      // put here the gateway (IP of your router)
 IPAddress subnet(255, 255, 255, 0);
@@ -334,6 +334,10 @@ void connection() {
 //********************* openAP **********************************
 static void openAP()  {
 
+  #ifdef SerialOutput
+  Serial.print("...open Accesspoint.");
+  #endif
+
   WiFi.softAPConfig (staticIP, gateway, subnet);
   if (!WiFi.softAP(ssid, password)) {
     Serial.println("AP creation failed.");
@@ -342,6 +346,7 @@ static void openAP()  {
   IPAddress myIP = WiFi.softAPIP();
   
   #ifdef SerialOutput
+  Serial.println("...Access!");
   Serial.print("AP IP address: ");
   Serial.println(myIP);
   #endif
@@ -540,6 +545,8 @@ void StaticScreenParts() {
 
 
 //********************* INA PARTS **********************************
+
+/*
 static void writeRegister(int INA226_ADDR, byte reg, word value) {
   Wire.beginTransmission(INA226_ADDR);
   Wire.write(reg);
@@ -548,8 +555,9 @@ static void writeRegister(int INA226_ADDR, byte reg, word value) {
   Wire.endTransmission();
 
 }
+*/
 
-
+/*
 static word readRegister(int INA226_ADDR, byte reg) {
   word res = 0x0000;
   Wire.beginTransmission(INA226_ADDR);
@@ -562,6 +570,7 @@ static word readRegister(int INA226_ADDR, byte reg) {
   }
   return res;
 }
+*/
 // INA PARTS
 
 
