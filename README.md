@@ -3,4 +3,8 @@
  
  http://www.teensymower.com
  
- 
+ New Version: 01.07.23
+
+If Stationmode was not sucessfull an AP will be started.
+INA226_WE library is used.
+ArduinoOTA
