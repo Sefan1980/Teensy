@@ -1,5 +1,5 @@
 /*
-  WIFI Communicating sender with 2 possible loop
+  WIFI Communicating sender with 2 possible loops
   Adjust IP according to your ESP32 value 10.0.0.150 in this example
   On your browser send :
   http://10.0.0.150/A0  *************** to stop the sender on wire connected on output A
@@ -14,44 +14,46 @@
 
   If USE_STATION : the sender start and stop automaticly if the mower is in the station or not
 
-  ------VERSION VON STEFAN------
+  ------COLLABORATION FROM BERNARD, SASCHA AND STEFAN------
 */
 
 //********************* defines **********************************
-#define OTAUpdates 1              // OTA Updates
-#define USE_STATION 1             // a station is connected and is used to charge the mower
-#define USE_PERI_CURRENT 1        // use Feedback for perimeter current measurements? (set to '0' if not connected!)
-#define USE_BUTTON 0              // use button to start mowing or send mower to station not finish to dev
-//#define USE_RAINFLOW 0            // check the amount of rain not finish to dev on 31/08/2020
-#define WORKING_TIMEOUT_MINS 300  // timeout for perimeter switch-off if robot not in station (minutes)
-#define PERI_CURRENT_MIN 200      // minimum milliAmpere for cutting wire detection
-#define AUTO_START_SIGNAL 1       // use to start sender when mower leave station
-#define I2C_SDA 21                // SDA pin
-#define I2C_SCL 22                // SCL pin
-//#define SerialOutput 1          // Show Serial Textmessages for debugging
-#define Screen 1                  // Screen or not?
-#define pinIN1 12                 // M1_IN1  ESP32 GPIO12       ( connect this pin to L298N-IN1)
-#define pinIN2 13                 // M1_IN2  ESP32 GPIO13       ( connect this pin to L298N-IN2)
-#define pinEnableA 23             // ENA    ESP32 GPIO23         (connect this pin to L298N-ENA)
-#define pinIN3 14                 // M1_IN3  ESP32 GPIO14       ( connect this pin to L298N-IN3)
-#define pinIN4 18                 // M1_IN4  ESP32 GPIO18       ( connect this pin to L298N-IN4)
-#define pinEnableB 19             // ENB    ESP32 GPIO19        (connect this pin to L298N-ENA)
-#define pinDoorOpen 34            // Not in use (Magnetic switch)
-#define pinDoorClose 35           // Not in use (Magnetic switch)
-#define pinLDR 32                 // Not in use (Light Sensor)
-#define pinGreenLED 25            // Not in use
-#define pinRedLED 26              // Not in use
-#define VER "ESP32 3.0"           // code version
+#define OTAUpdates 1                  // OTA Updates
+#define USE_STATION 1                 // a station is connected and is used to charge the mower
+#define USE_PERI_CURRENT 1            // use Feedback for perimeter current measurements? (set to '0' if not connected!)
+#define USE_BUTTON 0                  // use button to start mowing or send mower to station not finish to dev
+#define WORKING_TIMEOUT_MINS 300      // timeout for perimeter switch-off if robot not in station (minutes)
+#define PERI_CURRENT_MIN 200          // minimum milliAmpere for cutting wire detection
+#define AUTO_START_SIGNAL 1           // use to start sender when mower leave station
+#define I2C_SDA 21                    // SDA pin
+#define I2C_SCL 22                    // SCL pin
+#define SerialOutput 1                // Show Serial Textmessages for debugging
+#define Screen 1                      // Screen or not?
+#define pinIN1 12                     // M1_IN1  ESP32 GPIO12       ( connect this pin to L298N-IN1)
+#define pinIN2 13                     // M1_IN2  ESP32 GPIO13       ( connect this pin to L298N-IN2)
+#define pinEnableA 23                 // ENA    ESP32 GPIO23         (connect this pin to L298N-ENA)
+#define pinIN3 14                     // M1_IN3  ESP32 GPIO14       ( connect this pin to L298N-IN3)
+#define pinIN4 18                     // M1_IN4  ESP32 GPIO18       ( connect this pin to L298N-IN4)
+#define pinEnableB 19                 // ENB    ESP32 GPIO19        (connect this pin to L298N-ENA)
+#define pinDoorOpen 34                // Not in use (Magnetic switch)
+#define pinDoorClose 35               // Not in use (Magnetic switch)
+#define pinLDR 32                     // Not in use (Light Sensor)
+#define pinGreenLED 25                // Not in use
+#define pinRedLED 26                  // Not in use
+#define VER "ESP32Sender 01.07.23"    // code version
 
 //********************* includes **********************************
 #include <Wire.h>
 #include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiAP.h>
+#include <INA226_WE.h>                // INA226_WE library from Wolfgang Ewald
 #ifdef OTAUpdates
   #include <ESPmDNS.h>
   #include <WiFiUdp.h>
-  #include <ArduinoOTA.h>
+  #include <ArduinoOTA.h>             // ArduinoOTA from Juraj Andrassy
 #endif
-#include <U8x8lib.h>  //Please install the library U8g2 from Oliver Kraus
+#include <U8x8lib.h>                  // U8g2 from Oliver Kraus
 
 //********************* Display Settings **********************************
 // Please UNCOMMENT one of the contructor lines below
@@ -65,20 +67,26 @@ U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 // End of constructor list
 
 //********************* WLAN Settings **********************************
-const char* ssid = "WLAN 2,4GHz";          // put here your acces point ssid
-const char* password = "password";  // put here the password
-IPAddress staticIP(192,168,178,222);  // put here the static IP
-IPAddress gateway(192,168,178,1);     // put here the gateway (IP of your routeur)
+const char* ssid = "Your SSID";                         // put here your acces point ssid -->  If you use the station an an Accesspoint, put the SSID for your AP here. The SSID for AP should not match an existing network.
+const char* password = "Your password";                 // put here the password - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password here.
+IPAddress staticIP(192, 168, 178, 222);                 // put here the static IP --> Used for AP too!
+IPAddress gateway(192, 168, 178, 1);                    // put here the gateway (IP of your router)
 IPAddress subnet(255, 255, 255, 0);
-IPAddress dns(192,168,178,1);  // put here one dns (IP of your routeur)
+IPAddress dns(192, 168, 178, 1);                        // put here the dns (IP of your router)
 WiFiServer server(80);
+bool APconnected = false;
+
+//********************* INA226 Settings **********************************
+INA226_WE InaPeri = INA226_WE(0x40);                    // 0x40 = without bridge
+INA226_WE InaCharge = INA226_WE(0x44);                  // 0x44 = bridge between A1 and VSS
+float resistorPeri = 0.02;                              // for 10mOhm resistor don't try 0.01, try 0.02. For 100mOhm resistor use 0.1 
+float resistorCharge = 0.02;
+float rangePeri = 4.0;                                  // Range for 10mOhm Resistor: try 8.0 od 4.0 - For 100mOhm use 0.8
+float rangeCharge = 4.0;
 
 //********************* other **********************************
 int column = 2;                                         //used in function scanNetwork. It's for the Screen. (Print SSID for each network found)
 bool firstStart = true;
-int INAPERI = 0x40;                                     // without bridge
-int INACHARGE = 0x44;                                   // bridge between A1 - VSS
-
 byte sigCodeInUse = 1;                                  // 1 is the original ardumower sigcode
 int sigDuration = 104;                                  // send the bits each 104 microsecond (Also possible 50)
 int8_t sigcode_norm[128];
@@ -86,23 +94,21 @@ int sigcode_size;
 hw_timer_t* timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 volatile int step = 0;
-boolean enableSenderA = false;  //OFF on start to autorise the reset
-boolean enableSenderB = false;  //OFF on start to autorise the reset
+boolean enableSenderA = false;                          //OFF on start to autorise the reset
+boolean enableSenderB = false;                          //OFF on start to autorise the reset
 int timeSeconds = 0;
 unsigned long nextTimeControl = 0;
 unsigned long nextTimeInfo = 0;
 unsigned long nextTimeSec = 0;
 unsigned long nextTimeCheckButton = 0;
 int workTimeMins = 0;
-float PeriCurrent = 0.0;        // in mA
-float PeriBusVoltage = 0.0;     // voltage at the wire
-int PeriShuntVoltage = 0;       // voltage drop across the shunt
-float PeriShuntR = 0.1;         // shuntresistor in ohm
+float PeriCurrent = 0.0;                                // in mA
+float PeriBusVoltage = 0.0;                             // voltage at the wire
+float PeriShuntVoltage = 0.0;                           // voltage drop across the shunt
 float ChargeCurrent = 0.0;
 float ChargeCurrentPrint = 0.0;
 float ChargeBusVoltage = 0.0;
-int ChargeShuntVoltage = 0;
-float ChargeShuntR = 0.1;
+float ChargeShuntVoltage = 0.0;
 
 //*********************  Sigcode list *********************************************
 // must be multiple of 2 !
@@ -114,6 +120,15 @@ int8_t sigcode2[] = { 1, 1, -1, -1, 1, -1, 1, -1, -1, 1, -1, 1, 1, -1, -1, 1, -1
 int8_t sigcode3[] = { 1, 1, -1, -1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, 1, -1, 1, -1, 1, -1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, -1, 1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1, 1, -1, -1, 1, -1,
                       -1, 1, 1, -1, 1, 1, -1, -1, 1, -1, -1, 1, -1, 1, -1, 1, 1, -1, 1, -1, -1, 1, -1, -1, 1, 1, -1, 1, -1, -1, 1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, 1, -1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1, -1, -1, 1, 1, -1, 1, 1, -1, -1, 1 };  // 128 Zahlen from Roland
 int8_t sigcode4[] = { 1, 1, 1, -1, -1, -1 };                                                                                                                                                                                                              //extend square test code
+
+
+//***** END OF CONFIGURATION *****
+
+
+
+
+
+
 
 
 //********************* Functions **********************************
@@ -182,7 +197,7 @@ void IRAM_ATTR onTimer() {
 // End of Signalmanagement
 
 //********************* CHANGE AREA **********************************
-void changeArea(byte areaInMowing) {  // not finish to dev
+void changeArea(byte areaInMowing) {
   step = 0;
   enableSenderA = false;
   enableSenderB = false;
@@ -261,7 +276,7 @@ void changeArea(byte areaInMowing) {  // not finish to dev
     u8x8.setCursor(0,4);
     u8x8.print("sigcode size:");
     u8x8.print(sigcode_size);
-    delay(5000);
+    delay(2000);
   #endif
 }
 // END ChangeArea
@@ -321,6 +336,51 @@ void connection() {
 }
 // END Connection
 
+
+//********************* openAP **********************************
+static void openAP()  {
+
+  #ifdef SerialOutput
+  Serial.print("...open Accesspoint.");
+  #endif
+
+  WiFi.softAPConfig (staticIP, gateway, subnet);
+  if (!WiFi.softAP(ssid, password)) {
+    Serial.println("AP creation failed.");
+    while(1);
+  }
+  IPAddress myIP = WiFi.softAPIP();
+  
+  #ifdef SerialOutput
+  Serial.println("...Access!");
+  Serial.print("AP IP address: ");
+  Serial.println(myIP);
+  #endif
+
+  #ifdef Screen
+    u8x8.clear();
+    u8x8.setCursor(0, 1);
+    u8x8.print("AP-IP-addr:");
+    u8x8.setCursor(0, 3);
+    u8x8.print(myIP);
+  #endif
+
+  server.begin();
+  
+  #ifdef SerialOutput
+    Serial.println("Server started");
+  #endif
+
+  #ifdef Screen
+  u8x8.setCursor(0, 5);
+  u8x8.print("Server started");
+  #endif
+  APconnected = true;
+  delay(3000);
+}  
+// END openAP
+
+
 //********************* SCANNETWORK **********************************
 static void ScanNetwork() {
 
@@ -334,14 +394,17 @@ static void ScanNetwork() {
       u8x8.println("Hotspot Lost!");
     }
     u8x8.print("Scan Network");
-    firstStart = false;
   #endif
 
   #ifdef SerialOutput
-    Serial.println("Hotspot Lost");
+    if (!firstStart) {
+      Serial.println("Hotspot Lost");
+    }
+    Serial.println("Scan Network");
   #endif
-
-  delay(5000);  // wait until all is disconnect
+  
+  firstStart = false;
+  delay(1000);  // wait until all is disconnect
   int n = WiFi.scanNetworks();
   if (n == -1) {
     
@@ -359,7 +422,7 @@ static void ScanNetwork() {
       Serial.println("If sender is OFF");
     #endif
         
-    delay(5000);
+    delay(2000);
     if ((!enableSenderA) && (!enableSenderB)) ESP.restart();  // do not reset if sender is ON
   }
   if (n == -2)    //bug in esp32 if wifi is lost many time the esp32 fail to autoreconnect,maybe solve in other firmware ???????
@@ -379,7 +442,7 @@ static void ScanNetwork() {
       Serial.println("If sender is OFF");
     #endif
         
-    delay(5000);
+    delay(3000);
     if ((!enableSenderA) && (!enableSenderB)) ESP.restart();
   }
   if (n == 0) {
@@ -437,8 +500,13 @@ static void ScanNetwork() {
         //i = 200;  //to avoid loop again when connected
       }
     }
-    delay(5000);
-    if (findNetwork = true) connection();
+    delay(2000);
+    if (findNetwork == true)  {
+      connection();
+    } else
+    {
+      openAP();
+    }
   }
 }
 // END ScanNetwork
@@ -482,37 +550,14 @@ void StaticScreenParts() {
 }
 // END StaticScreenParts
 
-
-//********************* INA PARTS **********************************
-static void writeRegister(int INA226_ADDR, byte reg, word value) {
-  Wire.beginTransmission(INA226_ADDR);
-  Wire.write(reg);
-  Wire.write((value >> 8) & 0xFF);
-  Wire.write(value & 0xFF);
-  Wire.endTransmission();
-
-}
-
-
-static word readRegister(int INA226_ADDR, byte reg) {
-  word res = 0x0000;
-  Wire.beginTransmission(INA226_ADDR);
-  Wire.write(reg);
-  if (Wire.endTransmission() == 0) {
-    if (Wire.requestFrom(INA226_ADDR, 2) >= 2) {
-      res  = Wire.read() * 256;
-      res += Wire.read();
-    }
-  }
-  return res;
-}
-// INA PARTS
-
-
 //********************* SETUP **********************************
 void setup() {
   Serial.begin(115200);                           // Serial interface start
   Wire.begin(I2C_SDA, I2C_SCL);                   // I2C interface start
+
+  InaPeri.init();                                 // initialize INA226 for perimetermeasuring 
+  InaCharge.init();                               // initialize INA226 for chargemeasuring
+
   u8x8.begin();                                   // Screen start
   u8x8.setFont(u8x8_font_5x8_f);                  // Screen font 
   u8x8.clear();
@@ -589,17 +634,16 @@ void setup() {
   #ifdef SerialOutput
     Serial.println("Measuring voltage and current using INA226 ...");
   #endif
-  writeRegister(INAPERI, 0x00, 0x127); //Write registry to INA
-  delay(100);
-  writeRegister(INAPERI, 0x05, 0x855);  //Write calibration to INA
-  delay(100);
-  writeRegister(INACHARGE, 0x00, 0x127); //Write registry to INA
-  delay(100);
-  writeRegister(INACHARGE, 0x05, 0x855);  //Write calibration to INA
+
+  InaPeri.setAverage(AVERAGE_4);
+  InaPeri.setResistorRange(resistorPeri, rangePeri);
+  InaPeri.waitUntilConversionCompleted();
+  InaCharge.setAverage(AVERAGE_4);
+  InaCharge.setResistorRange(resistorCharge, rangeCharge);
+  InaCharge.waitUntilConversionCompleted();
 
   //------------------------  ArduinoOTA  ----------------------------------------
-
-#ifdef OTAUpdates
+ #ifdef OTAUpdates
  ArduinoOTA.onStart([]() {
       String type;
       if (ArduinoOTA.getCommand() == U_FLASH)
@@ -644,16 +688,14 @@ void loop() {
       StaticScreenParts();
     #endif
 
+  
     if (USE_PERI_CURRENT) {
-      PeriBusVoltage = (readRegister(INAPERI, 0x02) * 1.25) / 1000;
-      PeriShuntVoltage = readRegister(INAPERI, 0x01) * 0.0025;
-      if (PeriShuntVoltage && 0x8000) {                               // eine negative Zahl? Dann 2er Komplement bilden
-        PeriShuntVoltage = ~PeriShuntVoltage;                         // alle Bits invertieren
-        PeriShuntVoltage += 1;                                        // 1 dazuzählen
-        PeriShuntVoltage *= -1 ;                                      // negativ machen
-      }
-      PeriCurrent = readRegister(INAPERI, 0x04) / 40.9668;          // Divider is configurable
-      PeriCurrent = PeriCurrent - 75.0;                        //the DC/DC,ESP32,LN298N drain 100 ma when nothing is ON and a wifi access point is found (To confirm ????)
+    
+      PeriBusVoltage = InaPeri.getBusVoltage_V();
+      PeriShuntVoltage = InaPeri.getShuntVoltage_mV();
+      PeriCurrent = InaPeri.getCurrent_mA();
+
+      PeriCurrent = PeriCurrent - 80.0;                        //the DC/DC, ESP32, LN298N drain between 80 and 100 mA when nothing is ON and a wifi access point is found (To confirm ????)
 
       if (PeriCurrent <= PERI_CURRENT_MIN) PeriCurrent = 0;
 
@@ -685,7 +727,8 @@ void loop() {
       }
     }
 
-    if ((WiFi.status() != WL_CONNECTED)) ScanNetwork();
+    if ((WiFi.status() != WL_CONNECTED && APconnected == false)) ScanNetwork();
+
     if (workTimeMins >= WORKING_TIMEOUT_MINS) {
       // switch off perimeter
       enableSenderA = false;
@@ -700,7 +743,7 @@ void loop() {
       digitalWrite(pinIN3, LOW);
       digitalWrite(pinIN4, LOW);
 
-      Serial.println("********************************   Timeout , so stop Sender  **********************************");
+      Serial.println("********************************   Timeout, so stop Sender  **********************************");
     }
   }
 
@@ -726,16 +769,11 @@ void loop() {
 
     if (USE_STATION) {
 
-      ChargeBusVoltage = (readRegister(INACHARGE, 0x02) * 1.25) / 1000;
-      ChargeShuntVoltage = readRegister(INACHARGE, 0x01) * 0.0025;
-  
-      if (ChargeShuntVoltage && 0x8000) {// eine negative Zahl? Dann 2er Komplement bilden
-        ChargeShuntVoltage = ~ChargeShuntVoltage; // alle Bits invertieren
-        ChargeShuntVoltage += 1;         // 1 dazuzählen
-        ChargeShuntVoltage *= -1 ;       // negativ machen
-      }
-      ChargeCurrent = readRegister(INACHARGE, 0x04) / 40.9668;
-      ChargeCurrentPrint=ChargeCurrent;                         // just a var to print on the screen
+      ChargeBusVoltage = InaCharge.getBusVoltage_V();
+      ChargeShuntVoltage = InaCharge.getShuntVoltage_mV();
+      ChargeCurrent = InaCharge.getCurrent_mA();
+
+      ChargeCurrentPrint = ChargeCurrent;                       // just a var to print on the screen
       if (ChargeCurrent < 10) ChargeCurrentPrint = 0;           // shows 0 when the mower is not charging
 
       #ifdef Screen
@@ -751,7 +789,8 @@ void loop() {
       Serial.println(ChargeBusVoltage);
       #endif
 
-      if (ChargeCurrent > 5) {  //mower is into the station ,in my test 410 ma are drained so possible to stop sender
+      if (ChargeCurrent > 5) {  // mower is into the station ,in my test 410 ma are drained so possible to stop sender - When ist fully loaded the current is about 6mA.
+                                // So keep it small, to avoid an activation from the perimeterwire before the mower starts.
         enableSenderA = false;
         enableSenderB = false;
 
@@ -937,22 +976,22 @@ void loop() {
       sResponse += "mA<br>Spannung in der Perimeterschleife = ";
       sResponse += PeriBusVoltage;
 
-      // sResponse += "V<br>PeriShuntVoltage= ";      // Shows the PeriShuntVoltage
-      // sResponse += PeriShuntVoltage;
-      // sResponse += "m";
+//       sResponse += "V<br>PeriShuntVoltage= ";      // Shows the PeriShuntVoltage
+//       sResponse += PeriShuntVoltage;
+//       sResponse += "m";
 
       sResponse += "V<br>Ladestrom = ";
       sResponse += ChargeCurrentPrint;
       sResponse += "mA<br>Ladespannung = ";
       sResponse += ChargeBusVoltage;
 
-      // sResponse += "V<br>ChargeShuntVoltage= ";      // Shows the ChargeShuntVoltage
-      // sResponse += ChargeShuntVoltage;
-      // sResponse += "m";
+//       sResponse += "V<br>ChargeShuntVoltage= ";      // Shows the ChargeShuntVoltage
+//       sResponse += ChargeShuntVoltage;
+//       sResponse += "m";
 
-      sResponse += "V<br>Signaldauer = ";
+      sResponse += "V<br>Sendet ein Bit des Signals alle: = ";
       sResponse += sigDuration;
-      sResponse += "ms<br>Signalcode = ";
+      sResponse += "us<br>Signalcode = ";
       sResponse += sigCodeInUse;
       sResponse += "<br>Sender A : ";
       sResponse += enableSenderA;
