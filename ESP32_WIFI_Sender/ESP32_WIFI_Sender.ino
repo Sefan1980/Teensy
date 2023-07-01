@@ -98,10 +98,10 @@ boolean enableSenderA = false;                          //OFF on start to autori
 boolean enableSenderB = false;                          //OFF on start to autorise the reset
 int timeSeconds = 0;
 unsigned long nextTimeControl = 0;
-unsigned long nextTimeInfo = 0;
 unsigned long nextTimeSec = 0;
-unsigned long nextTimeCheckButton = 0;
 int workTimeMins = 0;
+int workTimeChargeMins = 0;
+int lastChargeMins = 0;
 float PeriCurrent = 0.0;                                // in mA
 float PeriBusVoltage = 0.0;                             // voltage at the wire
 float PeriShuntVoltage = 0.0;                           // voltage drop across the shunt
@@ -747,7 +747,7 @@ void loop() {
     }
   }
 
-  if (millis() >= nextTimeSec) {
+  if (millis() >= nextTimeSec) {          // Do it every second
     nextTimeSec = millis() + 1000;
 
     #ifdef Screen
@@ -820,11 +820,33 @@ void loop() {
         }
       }
     }
+    /*
     timeSeconds++;
     if (((enableSenderA) || (enableSenderB)) && (timeSeconds >= 60)) {
       if (workTimeMins < 1440) workTimeMins++;
       timeSeconds = 0;
     }
+    */
+    
+    timeSeconds++;
+    if (((enableSenderA) || (enableSenderB)) && (timeSeconds >= 60)) {                    // If Sender is ON & 60 seconds are left
+      if (workTimeMins < 1440)  {                                                         // avoid overflow
+        workTimeMins++;                                                                   // count up a minute
+        timeSeconds = 0;                                                                  // set seconds back to 0
+        if (workTimeChargeMins > 0) {                                                     // If workTimeCharge > 0 (last state was CHARGING)
+          lastChargeMins = workTimeChargeMins;                                            // save this Time in lastChargeMins
+          workTimeChargeMins = 0;                                                         // and set it back to 0
+        }
+      }
+    } else  {
+      if ((workTimeChargeMins < 1440) && (ChargeCurrent > 10) && (timeSeconds >= 60)) {   // If Chargecurrent bigger than 10mA (Mower is in Station and Charge)
+      workTimeMins = 0;                                                                   // WorktimeMins reset
+        workTimeChargeMins++;                                                             // count up the workTimeChargeMins
+        timeSeconds = 0;                                                                  // seconds reset
+      }
+
+    }
+
 
     if ((enableSenderA) || (enableSenderB)) {
 
@@ -879,10 +901,6 @@ void loop() {
     #endif
   }
 
-  if (millis() >= nextTimeInfo) {
-    nextTimeInfo = millis() + 500;
-    float v = 0;
-  }
   // Check if a client has connected
   WiFiClient client = server.available();
   if (client) {
@@ -895,6 +913,7 @@ void loop() {
       Serial.println(req);
       Serial.println("------------------------ - ");
     #endif
+    
     // Match the request
     if (req.indexOf("GET /A0") != -1) {
       enableSenderA = false;
@@ -969,27 +988,31 @@ void loop() {
       String sResponse, sHeader;
       sResponse = "<html><head><title>TeensySender</title><META HTTP-EQUIV='refresh' CONTENT='5'></head><body><H3>MAC ADRESS = ";
       sResponse += WiFi.macAddress();
-      sResponse += "<BR>Betriebszeit der Perimeterschleife = ";
+      sResponse += "<BR>Current chargetime: ";
+      sResponse += workTimeChargeMins;
+      sResponse += "min.<BR>Last charge : ";
+      sResponse += lastChargeMins;
+      sResponse += "min.<BR>Uptime perimeterloop = ";
       sResponse += workTimeMins;
-      sResponse += "min.<br>Stromfluss in der Perimeterschleife = ";
+      sResponse += "min.<br>Current flow in the perimeter loop = ";
       sResponse += PeriCurrent;
-      sResponse += "mA<br>Spannung in der Perimeterschleife = ";
+      sResponse += "mA<br>Voltage in the perimeterloop = ";
       sResponse += PeriBusVoltage;
 
 //       sResponse += "V<br>PeriShuntVoltage= ";      // Shows the PeriShuntVoltage
 //       sResponse += PeriShuntVoltage;
 //       sResponse += "m";
 
-      sResponse += "V<br>Ladestrom = ";
+      sResponse += "V<br>Chargecurrent = ";
       sResponse += ChargeCurrentPrint;
-      sResponse += "mA<br>Ladespannung = ";
+      sResponse += "mA<br>Chargevoltage = ";
       sResponse += ChargeBusVoltage;
 
 //       sResponse += "V<br>ChargeShuntVoltage= ";      // Shows the ChargeShuntVoltage
 //       sResponse += ChargeShuntVoltage;
 //       sResponse += "m";
 
-      sResponse += "V<br>Sendet ein Bit des Signals alle: = ";
+      sResponse += "V<br>Sends one bit of the signal every :";
       sResponse += sigDuration;
       sResponse += "us<br>Signalcode = ";
       sResponse += sigCodeInUse;
