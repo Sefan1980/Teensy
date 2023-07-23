@@ -21,13 +21,13 @@
 #define OTAUpdates 1                  // OTA Updates
 #define USE_STATION 1                 // a station is connected and is used to charge the mower
 #define USE_PERI_CURRENT 1            // use Feedback for perimeter current measurements? (set to '0' if not connected!)
-#define USE_BUTTON 0                  // use button to start mowing or send mower to station not finish to dev
+//#define USE_BUTTON 0                // use button to start mowing or send mower to station not finish to dev
 #define WORKING_TIMEOUT_MINS 300      // timeout for perimeter switch-off if robot not in station (minutes)
 #define PERI_CURRENT_MIN 200          // minimum milliAmpere for cutting wire detection
 #define AUTO_START_SIGNAL 1           // use to start sender when mower leave station
 #define I2C_SDA 21                    // SDA pin
 #define I2C_SCL 22                    // SCL pin
-#define SerialOutput 1                // Show Serial Textmessages for debugging
+//#define SerialOutput 1              // Show Serial Textmessages for debugging
 #define Screen 1                      // Screen or not?
 #define pinIN1 12                     // M1_IN1  ESP32 GPIO12       ( connect this pin to L298N-IN1)
 #define pinIN2 13                     // M1_IN2  ESP32 GPIO13       ( connect this pin to L298N-IN2)
@@ -35,12 +35,17 @@
 #define pinIN3 14                     // M1_IN3  ESP32 GPIO14       ( connect this pin to L298N-IN3)
 #define pinIN4 18                     // M1_IN4  ESP32 GPIO18       ( connect this pin to L298N-IN4)
 #define pinEnableB 19                 // ENB    ESP32 GPIO19        (connect this pin to L298N-ENA)
-#define pinDoorOpen 34                // Not in use (Magnetic switch)
-#define pinDoorClose 35               // Not in use (Magnetic switch)
-#define pinLDR 32                     // Not in use (Light Sensor)
-#define pinGreenLED 25                // Not in use
-#define pinRedLED 26                  // Not in use
-#define VER "ESP32Sender 01.07.23"    // code version
+//#define pinDoorOpen 34              // Not in use (Magnetic switch)
+//#define pinDoorClose 35             // Not in use (Magnetic switch)
+//#define pinLDR 32                   // Not in use (Light Sensor)
+
+// At the PCB is a connector for a 2-color LED with common cathode(-). (Attention: The Matrix Mow800 has a LED with common anode(+)!!!)
+#define pinGreenLED 25                // Station is ready!
+
+// Battery is charging if ChargeCurrent > LoadingThreshold
+#define pinRedLED 26                  // Battery is charging
+
+#define VER "ESP32Sender 23.07.23"    // code version
 
 //********************* includes **********************************
 #include <Wire.h>
@@ -60,15 +65,15 @@
 // U8x8 Contructor List 
 // The complete list is available here: https://github.com/olikraus/u8g2/wiki/u8x8setupcpp
 // Please update the pin numbers according to your setup. Use U8X8_PIN_NONE if the reset pin is not connected
-//U8X8_NULL u8x8;	// null device, a 8x8 pixel display which does nothing
+
 //U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 	      
 //U8X8_SSD1306_128X64_ALT0_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 	      // same as the NONAME variant, but may solve the "every 2nd line skipped" problem
 U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 // End of constructor list
 
 //********************* WLAN Settings **********************************
-const char* ssid = "Your SSID";                         // put here your acces point ssid -->  If you use the station an an Accesspoint, put the SSID for your AP here. The SSID for AP should not match an existing network.
-const char* password = "Your password";                 // put here the password - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password here.
+const char* ssid = "Sefan WLAN 2,4GHz";                         // put here your acces point ssid -->  If you use the station an an Accesspoint, put the SSID for your AP here. The SSID for AP should not match an existing network.
+const char* password = "StefanJaninaRenkaDeik";                 // put here the password - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password here.
 IPAddress staticIP(192, 168, 178, 222);                 // put here the static IP --> Used for AP too!
 IPAddress gateway(192, 168, 178, 1);                    // put here the gateway (IP of your router)
 IPAddress subnet(255, 255, 255, 0);
@@ -76,13 +81,15 @@ IPAddress dns(192, 168, 178, 1);                        // put here the dns (IP 
 WiFiServer server(80);
 bool APconnected = false;
 
+
 //********************* INA226 Settings **********************************
 INA226_WE InaPeri = INA226_WE(0x40);                    // 0x40 = without bridge
 INA226_WE InaCharge = INA226_WE(0x44);                  // 0x44 = bridge between A1 and VSS
-float resistorPeri = 0.02;                              // for 10mOhm resistor don't try 0.01, try 0.02. For 100mOhm resistor use 0.1 
-float resistorCharge = 0.02;
-float rangePeri = 4.0;                                  // Range for 10mOhm Resistor: try 8.0 od 4.0 - For 100mOhm use 0.8
+float resistorPeri = 0.1;                               // for 10mOhm resistor try a value 0.02. For 100mOhm resistor use 0.1 
+float rangePeri = 0.8;                                  // Range for 10mOhm Resistor: try 8.0 od 4.0 - For 100mOhm use 0.8
+float resistorCharge = 0.02;                            
 float rangeCharge = 4.0;
+
 
 //********************* other **********************************
 int column = 2;                                         //used in function scanNetwork. It's for the Screen. (Print SSID for each network found)
@@ -109,6 +116,16 @@ float ChargeCurrent = 0.0;
 float ChargeCurrentPrint = 0.0;
 float ChargeBusVoltage = 0.0;
 float ChargeShuntVoltage = 0.0;
+
+/*
+  If the Mower is in station and fully charged, the current should be between
+  PeriOnOffThreshold(3mA) and ChargeThreshold(10mA)
+
+  If Perimeter starts and mower is in the station, change ChargeThreshold to 0. So you can see the original ChargeCurrent value at http://Your-IP/?
+  If mower is outside, ChargeCurrent should be 0
+*/
+float ChargeThreshold = 10.0;                           // in mA. If the Chargecurrent is below this value, at  the Display shows "0mA" 
+float PeriOnOffThreshold = 3.3;             // if ChargeCurrent is below this value, the perimeterloop starts working
 
 //*********************  Sigcode list *********************************************
 // must be multiple of 2 !
@@ -251,33 +268,27 @@ void changeArea(byte areaInMowing) {
   #ifdef SerialOutput
     Serial.print("New sigcode in use  : ");
     Serial.println(sigCodeInUse);
+
+    for (int uu = 0; uu <= (sigcode_size - 1); uu++) {
+      Serial.print(sigcode_norm[uu]);
+      Serial.print(",");
+    }
+    
+    Serial.println();
+    Serial.print("New sigcode size  : ");
+    Serial.println(sigcode_size);
   #endif
 
   #ifdef Screen
     u8x8.setCursor(0,2);
     u8x8.print("sigCode in use:");
     u8x8.print(sigCodeInUse);
-  #endif
-  for (int uu = 0; uu <= (sigcode_size - 1); uu++) {
-    #ifdef SerialOutput
-      Serial.print(sigcode_norm[uu]);
-      Serial.print(",");
-    #endif
-  
-
-  }
-  #ifdef SerialOutput
     Serial.println();
-    Serial.print("New sigcode size  : ");
+    Serial.print("New sigcode size: ");
     Serial.println(sigcode_size);
-  #endif
-  
-  #ifdef Screen
-    u8x8.setCursor(0,4);
-    u8x8.print("sigcode size:");
-    u8x8.print(sigcode_size);
     delay(2000);
   #endif
+
 }
 // END ChangeArea
 
@@ -376,7 +387,7 @@ static void openAP()  {
   u8x8.print("Server started");
   #endif
   APconnected = true;
-  delay(3000);
+  delay(2000);
 }  
 // END openAP
 
@@ -558,9 +569,11 @@ void setup() {
   InaPeri.init();                                 // initialize INA226 for perimetermeasuring 
   InaCharge.init();                               // initialize INA226 for chargemeasuring
 
+  #ifdef Screen
   u8x8.begin();                                   // Screen start
   u8x8.setFont(u8x8_font_5x8_f);                  // Screen font 
   u8x8.clear();
+  #endif
   timer = timerBegin(0, 80, true);                // Interrupt things
   timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, 104, true);
@@ -571,7 +584,11 @@ void setup() {
   pinMode(pinIN3, OUTPUT);
   pinMode(pinIN4, OUTPUT);
   pinMode(pinEnableB, OUTPUT);
-
+  pinMode(pinGreenLED, OUTPUT);                   // 2-color LED green
+  pinMode(pinRedLED, OUTPUT);                     // 2-color LED red
+  digitalWrite(pinGreenLED, LOW);
+  digitalWrite(pinRedLED, LOW);
+  
   #ifdef SerialOutput
     Serial.println("START");
     Serial.print("Teensymower Sender ");
@@ -637,10 +654,10 @@ void setup() {
 
   InaPeri.setAverage(AVERAGE_4);
   InaPeri.setResistorRange(resistorPeri, rangePeri);
-  InaPeri.waitUntilConversionCompleted();
+//  InaPeri.waitUntilConversionCompleted();
   InaCharge.setAverage(AVERAGE_4);
   InaCharge.setResistorRange(resistorCharge, rangeCharge);
-  InaCharge.waitUntilConversionCompleted();
+//  InaCharge.waitUntilConversionCompleted();
 
   //------------------------  ArduinoOTA  ----------------------------------------
  #ifdef OTAUpdates
@@ -773,8 +790,16 @@ void loop() {
       ChargeShuntVoltage = InaCharge.getShuntVoltage_mV();
       ChargeCurrent = InaCharge.getCurrent_mA();
 
-      ChargeCurrentPrint = ChargeCurrent;                       // just a var to print on the screen
-      if (ChargeCurrent < 10) ChargeCurrentPrint = 0;           // shows 0 when the mower is not charging
+      if (ChargeCurrent > PeriOnOffThreshold) {
+        digitalWrite(pinGreenLED, LOW);
+        digitalWrite(pinRedLED, HIGH);
+      } else  {
+        digitalWrite(pinRedLED, LOW);
+        digitalWrite(pinGreenLED, HIGH);
+      }
+
+      ChargeCurrentPrint = ChargeCurrent;                           // just a var to print on the screen
+      if (ChargeCurrent < ChargeThreshold) ChargeCurrentPrint = 0;  // shows 0 when the mower is not charging
 
       #ifdef Screen
         u8x8.setCursor(10, 6);
@@ -789,8 +814,8 @@ void loop() {
       Serial.println(ChargeBusVoltage);
       #endif
 
-      if (ChargeCurrent > 5) {  // mower is into the station ,in my test 410 ma are drained so possible to stop sender - When ist fully loaded the current is about 6mA.
-                                // So keep it small, to avoid an activation from the perimeterwire before the mower starts.
+      if (ChargeCurrent > PeriOnOffThreshold) {   // mower is into the station ,in my test 410 ma are drained so possible to stop sender - When ist fully loaded the current is about 4mA.
+                                                              // So keep it PeriOnOffThreshold, to avoid an activation from the perimeterwire before the mower starts.
         enableSenderA = false;
         enableSenderB = false;
 
@@ -820,6 +845,7 @@ void loop() {
         }
       }
     }
+    
     /*
     timeSeconds++;
     if (((enableSenderA) || (enableSenderB)) && (timeSeconds >= 60)) {
@@ -827,7 +853,7 @@ void loop() {
       timeSeconds = 0;
     }
     */
-    
+     
     timeSeconds++;
     if (((enableSenderA) || (enableSenderB)) && (timeSeconds >= 60)) {                    // If Sender is ON & 60 seconds are left
       if (workTimeMins < 1440)  {                                                         // avoid overflow
@@ -839,14 +865,14 @@ void loop() {
         }
       }
     } else  {
-      if ((workTimeChargeMins < 1440) && (ChargeCurrent > 10) && (timeSeconds >= 60)) {   // If Chargecurrent bigger than 10mA (Mower is in Station and Charge)
+      if ((workTimeChargeMins < 1440) && (ChargeCurrent > ChargeThreshold) && (timeSeconds >= 60)) {   // If Chargecurrent bigger than ChargeThreshold (Mower is in Station and Charge)
       workTimeMins = 0;                                                                   // WorktimeMins reset
         workTimeChargeMins++;                                                             // count up the workTimeChargeMins
         timeSeconds = 0;                                                                  // seconds reset
       }
 
     }
-
+    
 
     if ((enableSenderA) || (enableSenderB)) {
 
