@@ -1628,7 +1628,7 @@ void Robot::resetMotorFault() {
 
 
     // rain--------------------------------------------------------------------------------------------------------
-    case SEN_RAIN: if (digitalRead(pinRain) == LOW) return 1; break;
+    case SEN_RAIN: if (digitalRead(pinRain) == HIGH) return 1; break;
 
   }
   return 0;
@@ -3952,6 +3952,7 @@ void Robot::readSensors() {
     // read rain sensor
     nextTimeRain = millis() + 5000;
     rain = (digitalRead(pinRain));
+    rain = !rain;
     if (rain) rainCounter++;
   }
 }

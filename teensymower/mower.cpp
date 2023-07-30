@@ -582,7 +582,7 @@ void checkMotorFault() {
 
 
     // rain--------------------------------------------------------------------------------------------------------
-    case SEN_RAIN: if (digitalRead(pinRain) == LOW) return 1; break;
+    case SEN_RAIN: if (digitalRead(pinRain) == HIGH) return 1; break;
 
   }
   return 0;
