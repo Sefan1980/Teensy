@@ -18,17 +18,28 @@
 */
 
 //********************* defines **********************************
+// Comment the lines out, you don't need!
 #define OTAUpdates 1                  // OTA Updates
-#define USE_STATION 1                 // a station is connected and is used to charge the mower
-#define USE_PERI_CURRENT 1            // use Feedback for perimeter current measurements? (set to '0' if not connected!)
-//#define USE_BUTTON 0                // use button to start mowing or send mower to station not finish to dev
-#define WORKING_TIMEOUT_MINS 300      // timeout for perimeter switch-off if robot not in station (minutes)
-#define PERI_CURRENT_MIN 200          // minimum milliAmpere for cutting wire detection
-#define AUTO_START_SIGNAL 1           // use to start sender when mower leave station
+
+#define WhatsApp_messages 1           // Receive Messages when the mower starts from station and returns to station. (Configuration necessary)
+                                      // 1) Create the Whatabot contact in your smartphone. The phone number is: +54 9 2364205798
+                                      // 2) Send: "I allow whatabot to send me messages"
+                                      // 3) Copy the phonenumber and the API that Whatabot sent you and enter it below.
+String mobile_number = "4917012345678";// Type here your phone-number (e.g.: +49 170 123456789 --> 4917012345678)
+String api_key = "1122233344";          // Enter the API-key here
+
+#define AUTO_START_SIGNAL 1           // Use to start sender when mower leave station
+#define USE_STATION 1                 // This station is used to charge the Mower. Then show the chargecurrent.
+#define USE_PERI_CURRENT 1            // Use Feedback for perimeter current measurements? (set to '0' if not connected!)
+//#define USE_BUTTON 0                // Use button to start mowing or send mower to station not finish
+//#define SerialOutput 1              // Show terial textmessages for debugging
+#define Screen 1                      // Screen or not?
+
+#define WORKING_TIMEOUT_MINS 300      // Timeout for perimeter switch-off if robot not in station (minutes) - If AUTO_START_SIGNAL is active, this setting does not work!
+#define PERI_CURRENT_MIN 200          // Minimum milliAmpere for cutting wire detection
+
 #define I2C_SDA 21                    // SDA pin
 #define I2C_SCL 22                    // SCL pin
-//#define SerialOutput 1              // Show Serial Textmessages for debugging
-#define Screen 1                      // Screen or not?
 #define pinIN1 12                     // M1_IN1  ESP32 GPIO12       ( connect this pin to L298N-IN1)
 #define pinIN2 13                     // M1_IN2  ESP32 GPIO13       ( connect this pin to L298N-IN2)
 #define pinEnableA 23                 // ENA    ESP32 GPIO23         (connect this pin to L298N-ENA)
@@ -45,12 +56,14 @@
 // Battery is charging if ChargeCurrent > LoadingThreshold
 #define pinRedLED 26                  // Battery is charging
 
-#define VER "ESP32Sender 23.07.23"    // code version
+#define VER "ESP32Sender 03.10.23"    // code version
 
 //********************* includes **********************************
 #include <Wire.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
+#include <HTTPClient.h>
+#include <UrlEncode.h>
 #include <WiFiAP.h>
 #include <INA226_WE.h>                // INA226_WE library from Wolfgang Ewald
 #ifdef OTAUpdates
@@ -58,22 +71,22 @@
   #include <WiFiUdp.h>
   #include <ArduinoOTA.h>             // ArduinoOTA from Juraj Andrassy
 #endif
-#include <U8x8lib.h>                  // U8g2 from Oliver Kraus
 
+#include <U8x8lib.h>                  // U8g2 from Oliver Kraus
 //********************* Display Settings **********************************
 // Please UNCOMMENT one of the contructor lines below
 // U8x8 Contructor List 
 // The complete list is available here: https://github.com/olikraus/u8g2/wiki/u8x8setupcpp
 // Please update the pin numbers according to your setup. Use U8X8_PIN_NONE if the reset pin is not connected
-
-//U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 	      
+ //U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 	      
 //U8X8_SSD1306_128X64_ALT0_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 	      // same as the NONAME variant, but may solve the "every 2nd line skipped" problem
 U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 // End of constructor list
 
+
 //********************* WLAN Settings **********************************
-const char* ssid = "Sefan WLAN 2,4GHz";                         // put here your acces point ssid -->  If you use the station an an Accesspoint, put the SSID for your AP here. The SSID for AP should not match an existing network.
-const char* password = "StefanJaninaRenkaDeik";                 // put here the password - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password here.
+const char* ssid = "WLAN";                         // put here your acces point ssid -->  If you use the station an an Accesspoint, put the SSID for your AP here. The SSID for AP should not match an existing network.
+const char* password = "PASS";                 // put here the password - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password here.
 IPAddress staticIP(192, 168, 178, 222);                 // put here the static IP --> Used for AP too!
 IPAddress gateway(192, 168, 178, 1);                    // put here the gateway (IP of your router)
 IPAddress subnet(255, 255, 255, 0);
@@ -81,17 +94,18 @@ IPAddress dns(192, 168, 178, 1);                        // put here the dns (IP 
 WiFiServer server(80);
 bool APconnected = false;
 
-
 //********************* INA226 Settings **********************************
 INA226_WE InaPeri = INA226_WE(0x40);                    // 0x40 = without bridge
-INA226_WE InaCharge = INA226_WE(0x44);                  // 0x44 = bridge between A1 and VSS
 float resistorPeri = 0.1;                               // for 10mOhm resistor try a value 0.02. For 100mOhm resistor use 0.1 
 float rangePeri = 0.8;                                  // Range for 10mOhm Resistor: try 8.0 od 4.0 - For 100mOhm use 0.8
+
+INA226_WE InaCharge = INA226_WE(0x44);                  // 0x44 = bridge between A1 and VSS
 float resistorCharge = 0.02;                            
 float rangeCharge = 4.0;
 
 
 //********************* other **********************************
+bool mowerIsWorking = 0;                                // Code for Whatsapp
 int column = 2;                                         //used in function scanNetwork. It's for the Screen. (Print SSID for each network found)
 bool firstStart = true;
 byte sigCodeInUse = 1;                                  // 1 is the original ardumower sigcode
@@ -124,7 +138,7 @@ float ChargeShuntVoltage = 0.0;
   If Perimeter starts and mower is in the station, change ChargeThreshold to 0. So you can see the original ChargeCurrent value at http://Your-IP/?
   If mower is outside, ChargeCurrent should be 0
 */
-float ChargeThreshold = 10.0;                           // in mA. If the Chargecurrent is below this value, at  the Display shows "0mA" 
+float ChargeThreshold = 10.0;               // in mA. If the Chargecurrent is below this value, at  the Display shows "0mA" 
 float PeriOnOffThreshold = 3.3;             // if ChargeCurrent is below this value, the perimeterloop starts working
 
 //*********************  Sigcode list *********************************************
@@ -149,6 +163,32 @@ int8_t sigcode4[] = { 1, 1, 1, -1, -1, -1 };                                    
 
 
 //********************* Functions **********************************
+
+
+//********************* Code for Whatsapp **********************************
+void sendWhatsappMessage(String message){
+  #ifdef WhatsApp_messages
+    String API_URL = "https://api.whatabot.net/whatsapp/sendMessage?apikey=" + api_key + "&text=" + urlEncode(message) + "&phone=" + mobile_number;
+    HTTPClient http;
+    http.begin(API_URL);
+
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  
+    int http_response_code = http.GET();
+    if (http_response_code == 200){
+      Serial.print("Whatsapp message sent successfully");
+    }
+    else{
+      Serial.println("Error sending the message");
+      Serial.print("HTTP response code: ");
+      Serial.println(http_response_code);
+    }
+
+    http.end();
+  #endif
+}
+// End of Code for Whatsapp
+
 
 //********************* SIGNAL MANAGEMENT **********************************
 void IRAM_ATTR onTimer() {
@@ -688,6 +728,9 @@ void setup() {
 
   ArduinoOTA.begin();
   #endif
+
+  sendWhatsappMessage("Teensysender is now online.");          // Code for Whatsapp
+
 }
 // END SETUP
 
@@ -815,9 +858,14 @@ void loop() {
       #endif
 
       if (ChargeCurrent > PeriOnOffThreshold) {   // mower is into the station ,in my test 410 ma are drained so possible to stop sender - When ist fully loaded the current is about 4mA.
-                                                              // So keep it PeriOnOffThreshold, to avoid an activation from the perimeterwire before the mower starts.
+                                                  // So keep keep the value small to avoid an activation from the perimeterwire before the mower starts.
         enableSenderA = false;
         enableSenderB = false;
+
+        if(mowerIsWorking == 1)  {
+          mowerIsWorking = 0;
+          sendWhatsappMessage("Mower is back at Home!");          // Code for Whatsapp
+        }
 
         workTimeMins = 0;
         digitalWrite(pinEnableA, LOW);
@@ -827,10 +875,14 @@ void loop() {
         digitalWrite(pinEnableB, LOW);
         digitalWrite(pinIN3, LOW);
         digitalWrite(pinIN4, LOW);
-
+        delay(200);
       } else {
         if (AUTO_START_SIGNAL) {
           //always start to send a signal when mower leave station
+           if(mowerIsWorking == 0)  {
+            mowerIsWorking = 1;
+            sendWhatsappMessage("Mower is going to work!");          // Code for Whatsapp
+          }
           if (!enableSenderB) {
             enableSenderA = true;
             digitalWrite(pinEnableA, HIGH);
@@ -1025,18 +1077,18 @@ void loop() {
       sResponse += "mA<br>Voltage in the perimeterloop = ";
       sResponse += PeriBusVoltage;
 
-//       sResponse += "V<br>PeriShuntVoltage= ";      // Shows the PeriShuntVoltage
-//       sResponse += PeriShuntVoltage;
-//       sResponse += "m";
+//    sResponse += "V<br>PeriShuntVoltage= ";      // Shows the PeriShuntVoltage
+//    sResponse += PeriShuntVoltage;
+//    sResponse += "m";
 
       sResponse += "V<br>Chargecurrent = ";
       sResponse += ChargeCurrentPrint;
       sResponse += "mA<br>Chargevoltage = ";
       sResponse += ChargeBusVoltage;
 
-//       sResponse += "V<br>ChargeShuntVoltage= ";      // Shows the ChargeShuntVoltage
-//       sResponse += ChargeShuntVoltage;
-//       sResponse += "m";
+//    sResponse += "V<br>ChargeShuntVoltage= ";      // Shows the ChargeShuntVoltage
+//    sResponse += ChargeShuntVoltage;
+//    sResponse += "m";
 
       sResponse += "V<br>Sends one bit of the signal every :";
       sResponse += sigDuration;
