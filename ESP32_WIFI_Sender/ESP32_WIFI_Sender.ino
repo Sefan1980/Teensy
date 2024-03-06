@@ -25,14 +25,14 @@
                                       // 1) Create the Whatabot contact in your smartphone. The phone number is: +54 9 2364205798
                                       // 2) Send: "I allow whatabot to send me messages"
                                       // 3) Copy the phonenumber and the API that Whatabot sent you and enter it below.
-String mobile_number = "4917012345678";// Type here your phone-number (e.g.: +49 170 123456789 --> 4917012345678)
-String api_key = "1122233344";          // Enter the API-key here
+                                      // Type your phone-number (e.g.: +49 170 123456789 --> 4917012345678) and your API-key in PersonalAccessData.h
+
 
 #define AUTO_START_SIGNAL 1           // Use to start sender when mower leave station
 #define USE_STATION 1                 // This station is used to charge the Mower. Then show the chargecurrent.
 #define USE_PERI_CURRENT 1            // Use Feedback for perimeter current measurements? (set to '0' if not connected!)
 //#define USE_BUTTON 0                // Use button to start mowing or send mower to station not finish
-//#define SerialOutput 1              // Show terial textmessages for debugging
+//#define SerialOutput 1              // Show serial textmessages for debugging
 #define Screen 1                      // Screen or not?
 
 #define WORKING_TIMEOUT_MINS 300      // Timeout for perimeter switch-off if robot not in station (minutes) - If AUTO_START_SIGNAL is active, this setting does not work!
@@ -56,10 +56,11 @@ String api_key = "1122233344";          // Enter the API-key here
 // Battery is charging if ChargeCurrent > LoadingThreshold
 #define pinRedLED 26                  // Battery is charging
 
-#define VER "ESP32Sender 03.10.23"    // code version
+#define VER "ESP32Sender 06.03.24"    // code version
 
 //********************* includes **********************************
 #include <Wire.h>
+#include "PersonalAccessData.h"       // Here is your SSID and your password for WLAN access and your phonenumber and the API for Whatsapp-messaging
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <HTTPClient.h>
@@ -85,8 +86,8 @@ U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 
 
 //********************* WLAN Settings **********************************
-const char* ssid = "WLAN";                         // put here your acces point ssid -->  If you use the station an an Accesspoint, put the SSID for your AP here. The SSID for AP should not match an existing network.
-const char* password = "PASS";                 // put here the password - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password here.
+                                                        // put your acces point ssid in the PersonalAccessData.h -->  If you use the station an an Accesspoint, put the SSID for your AP there. The SSID for AP should not match an existing network.
+                                                        // put your password in the PersonalAccessData.h - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password there.
 IPAddress staticIP(192, 168, 178, 222);                 // put here the static IP --> Used for AP too!
 IPAddress gateway(192, 168, 178, 1);                    // put here the gateway (IP of your router)
 IPAddress subnet(255, 255, 255, 0);
@@ -94,10 +95,11 @@ IPAddress dns(192, 168, 178, 1);                        // put here the dns (IP 
 WiFiServer server(80);
 bool APconnected = false;
 
+
 //********************* INA226 Settings **********************************
 INA226_WE InaPeri = INA226_WE(0x40);                    // 0x40 = without bridge
 float resistorPeri = 0.1;                               // for 10mOhm resistor try a value 0.02. For 100mOhm resistor use 0.1 
-float rangePeri = 0.8;                                  // Range for 10mOhm Resistor: try 8.0 od 4.0 - For 100mOhm use 0.8
+float rangePeri = 0.8;                                  // Range for 10mOhm Resistor: try 8.0 or 4.0 - For 100mOhm use 0.8
 
 INA226_WE InaCharge = INA226_WE(0x44);                  // 0x44 = bridge between A1 and VSS
 float resistorCharge = 0.02;                            
@@ -105,8 +107,9 @@ float rangeCharge = 4.0;
 
 
 //********************* other **********************************
+bool WORKING_TIMEOUT = 0;
 bool mowerIsWorking = 0;                                // Code for Whatsapp
-int column = 2;                                         //used in function scanNetwork. It's for the Screen. (Print SSID for each network found)
+int column = 2;                                         //used in function scanNetwork. It's for the screen. (Print SSID for each network found)
 bool firstStart = true;
 byte sigCodeInUse = 1;                                  // 1 is the original ardumower sigcode
 int sigDuration = 104;                                  // send the bits each 104 microsecond (Also possible 50)
@@ -793,8 +796,9 @@ void loop() {
       // switch off perimeter
       enableSenderA = false;
       enableSenderB = false;
-
+ 
       workTimeMins = 0;
+      WORKING_TIMEOUT = 1;
       digitalWrite(pinEnableA, LOW);
       digitalWrite(pinIN1, LOW);
       digitalWrite(pinIN2, LOW);
@@ -803,6 +807,8 @@ void loop() {
       digitalWrite(pinIN3, LOW);
       digitalWrite(pinIN4, LOW);
 
+      sendWhatsappMessage("TIMEOUT! Mower didn't come back home! Perimeterwire switched off!");          // Code for Whatsapp
+ 
       Serial.println("********************************   Timeout, so stop Sender  **********************************");
     }
   }
@@ -833,7 +839,7 @@ void loop() {
       ChargeShuntVoltage = InaCharge.getShuntVoltage_mV();
       ChargeCurrent = InaCharge.getCurrent_mA();
 
-      if (ChargeCurrent > PeriOnOffThreshold) {
+      if (ChargeCurrent > PeriOnOffThreshold) {  //Just for charge LED
         digitalWrite(pinGreenLED, LOW);
         digitalWrite(pinRedLED, HIGH);
       } else  {
@@ -864,6 +870,7 @@ void loop() {
 
         if(mowerIsWorking == 1)  {
           mowerIsWorking = 0;
+          WORKING_TIMEOUT = 0;
           sendWhatsappMessage("Mower is back at Home!");          // Code for Whatsapp
         }
 
@@ -877,7 +884,7 @@ void loop() {
         digitalWrite(pinIN4, LOW);
         delay(200);
       } else {
-        if (AUTO_START_SIGNAL) {
+        if (AUTO_START_SIGNAL && !WORKING_TIMEOUT ) {
           //always start to send a signal when mower leave station
            if(mowerIsWorking == 0)  {
             mowerIsWorking = 1;
