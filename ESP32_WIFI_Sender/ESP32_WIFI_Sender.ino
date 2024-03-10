@@ -142,7 +142,7 @@ float ChargeShuntVoltage = 0.0;
   If mower is outside, ChargeCurrent should be 0
 */
 float ChargeThreshold = 10.0;               // in mA. If the Chargecurrent is below this value, at  the Display shows "0mA" 
-float PeriOnOffThreshold = 3.3;             // if ChargeCurrent is below this value, the perimeterloop starts working
+float PeriOnOffThreshold = 2.0;             // if ChargeCurrent is below this value, the perimeterloop starts working
 
 //*********************  Sigcode list *********************************************
 // must be multiple of 2 !
@@ -905,13 +905,6 @@ void loop() {
       }
     }
     
-    /*
-    timeSeconds++;
-    if (((enableSenderA) || (enableSenderB)) && (timeSeconds >= 60)) {
-      if (workTimeMins < 1440) workTimeMins++;
-      timeSeconds = 0;
-    }
-    */
      
     timeSeconds++;
     if (((enableSenderA) || (enableSenderB)) && (timeSeconds >= 60)) {                    // If Sender is ON & 60 seconds are left
@@ -929,7 +922,6 @@ void loop() {
         workTimeChargeMins++;                                                             // count up the workTimeChargeMins
         timeSeconds = 0;                                                                  // seconds reset
       }
-
     }
     
 
