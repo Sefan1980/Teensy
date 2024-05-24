@@ -1,25 +1,31 @@
+// use Bluetooth?
 #define BLUETOOTH
-//Select one of the 2 possibility AP (access point) or STA (station)
 
+// use WiFi?
 #define WiFiAccess
 
+//Select one of the 2 possibilities AP (access point) or STA (station)
 // Just one mode is possible
 #define MODE_AP           // phone connects directly to ESP32 inside the mower - Mower is an accesspoint! 
 //#define MODE_STA        // ESP32 connects to wifi router - Phone has to be connected to the same WiFi!
 
-// OTAupdates are just possible with MODE_STA
+// use OTAupdates? (just possible with MODE_STA)
 #define OTAupdates
 
+// buffersize
 #define bufferSize 1024
 
-bool debug = true;        // Show debug messages in serial console
+// Show debug messages in serial console
+bool debug = true;
 
-#define VERSION "1.00"
+// version
+#define VERSION "2.00"
 
+
+// If you use Station mode, type in your SSID, PASSWORD, IP, GATEWAY and SUBNETMASK
 #ifdef MODE_STA
-// For station mode:
-// You need to set a fix IP and gateway according your router value.
-// ssid and password according to your router
+
+// SSID and PASSWORD
 const char *ssid = "Your ssid";       // You will connect your phone to this Access Point
 const char *pw = "Your password";     // and this is the password
 
@@ -30,6 +36,7 @@ IPAddress netmask(255, 255, 255, 0);
 #endif
 
 
+// Use the following data when using the access point.
 #ifdef MODE_AP
 
 // For AP mode:
