@@ -15,6 +15,15 @@
 // buffersize
 #define bufferSize 1024
 
+// PFOD port
+const int PFODport = 8881;
+
+// Baudrate to console
+const int consoleBaud = 115200;
+
+// Baudrate to Mower
+const int mowerBaud = 230400;
+
 // Show debug messages in serial console
 bool debug = true;
 
