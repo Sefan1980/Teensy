@@ -47,8 +47,9 @@ void setup() {
   Serial2.begin(mowerBaud);
 
   
-  if (debug) Serial.println("\n\nESP32 BT and WiFi serial bridge");
-
+  if (debug) Serial.print("\n\nESP32 BT and WiFi serial bridge Version ");
+  if (debug) Serial.println(VERSION);
+  
   #ifdef MODE_AP
     if (debug) Serial.println("Open ESP Access Point mode");
     // AP mode (phone connects directly to ESP) (no router)
