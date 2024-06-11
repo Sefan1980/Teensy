@@ -29,7 +29,7 @@ BluetoothSerial SerialBT;
 // WiFi
 #include <WiFiClient.h>
 WiFiClient TheClient;
-WiFiServer TCPserver(8881);
+WiFiServer TCPserver(PFODport);
 #endif
 
 uint8_t BTbuf[bufferSize];
@@ -41,13 +41,13 @@ int connectCheck = 0;
 void setup() {
 
   // Open serial connection for console
-  Serial.begin(115200);
+  Serial.begin(consoleBaud);
 
   // Open serial connection to the Mower
-  Serial2.begin(230400);
+  Serial2.begin(mowerBaud);
 
   
-  if (debug) Serial.println("\n\nESP32 BT and WiFi serial bridge V1.00");
+  if (debug) Serial.println("\n\nESP32 BT and WiFi serial bridge");
 
   #ifdef MODE_AP
     if (debug) Serial.println("Open ESP Access Point mode");
