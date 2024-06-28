@@ -21,8 +21,8 @@ const int PFODport = 8881;
 // Baudrate to console
 const int consoleBaud = 115200;
 
-// Baudrate to Mower - Must be the same in mower.h at your mower
-const int mowerBaud = 230400;
+// Baudrate to Mower
+const int mowerBaud = 115200;
 
 // Show debug messages in serial console
 bool debug = true;
@@ -39,8 +39,8 @@ const char *ssid = "Your ssid";       // You will connect your phone to this Acc
 const char *pw = "Your password";     // and this is the password
 
 //for pfod use this IP and port 8881
-IPAddress ip(10, 0, 0, 122);          // IP for your Mower
-IPAddress gateway(10, 0, 0, 1);       // Gateway from your WiFi, most it's the Router IP
+IPAddress ip(192, 168, 178, 122);          // IP for your Mower
+IPAddress gateway(192, 168, 178, 1);       // Gateway from your WiFi, most it's the Router IP
 IPAddress netmask(255, 255, 255, 0);
 #endif
 
