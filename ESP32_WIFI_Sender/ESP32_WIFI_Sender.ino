@@ -120,6 +120,8 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 volatile int step = 0;
 boolean enableSenderA = false;                          //OFF on start to autorise the reset
 boolean enableSenderB = false;                          //OFF on start to autorise the reset
+int enableSenderAprint;
+int enableSenderBprint;
 int timeSeconds = 0;
 unsigned long nextTimeControl = 0;
 unsigned long nextTimeSec = 0;
@@ -617,8 +619,8 @@ void setup() {
   u8x8.setFont(u8x8_font_5x8_f);                  // Screen font 
   u8x8.clear();
   #endif
-  timer = timerBegin(0, 80, true);                // Interrupt things
-  timerAttachInterrupt(timer, &onTimer, true);
+  timer = timerBegin(1000000);                // Interrupt things
+  timerAttachInterrupt(timer, &onTimer);
   timerAlarmWrite(timer, 104, true);
   timerAlarmEnable(timer);
   pinMode(pinIN1, OUTPUT);                        // Pinmodes
@@ -1062,43 +1064,89 @@ void loop() {
     }
 
     if (req.indexOf("GET /?") != -1) {
-      String sResponse, sHeader;
-      sResponse = "<html><head><title>TeensySender</title><META HTTP-EQUIV='refresh' CONTENT='5'></head><body><H3>MAC ADRESS = ";
-      sResponse += WiFi.macAddress();
-      sResponse += "<BR>Current chargetime: ";
-      sResponse += workTimeChargeMins;
-      sResponse += "min.<BR>Last charge : ";
-      sResponse += lastChargeMins;
-      sResponse += "min.<BR>Uptime perimeterloop = ";
-      sResponse += workTimeMins;
-      sResponse += "min.<br>Current flow in the perimeter loop = ";
-      sResponse += PeriCurrent;
-      sResponse += "mA<br>Voltage in the perimeterloop = ";
+      String sResponse;
+
+      sResponse = "<html><head><title>TeensySender Controlpanel v1.0</title><META HTTP-EQUIV='refresh' CONTENT='5'></head><style type="text/css">body{padding-left: 0em;font-family: Helvetica, Geneva, Arial, SunSans-Regular, sans-serif;color: rgb(125, 0, 0);background-color: rgb(170, 210, 255);}table.fullscreen{border: 1px solid rgb(125, 0, 0);}td.on{border-right: 1em solid rgb(0, 255, 0);}td.off{border-right: 1em solid rgb(255, 0, 0);}h1{font-family: Helvetica, Geneva, Arial, SunSans-Regular, sans-serif;}</style><body>";
+/*      sResponse +="<table class='fullscreen' width='100%'><tr><td><h1 align='center'>TeensySender Controlpanel</h1></td></tr><table align='center'><tr><td>Chargevoltage:</td><td>&nbsp;</td><td>";
+      sResponse += ChargeBusVoltage;
+      sResponse += "V</td></tr><tr><td>Chargecurrent:</td><td>&nbsp;</td><td>";
+      sResponse += ChargeCurrentPrint;
+      sResponse += "mA</td></tr><tr><td>Perimetervoltage:</td><td>&nbsp;</td><td>";
       sResponse += PeriBusVoltage;
+      sResponse += "V</td></tr><tr><td>Perimetercurrent:</td><td>&nbsp;</td><td>";
+      sResponse += PeriCurrent;          
+      sResponse += "mA</td></tr><tr><td>Perimeterloop Uptime:</td><td>&nbsp;</td><td>";
+      sResponse += workTimeMins;          
+      sResponse += "min.</td></tr><tr><td>Signalcode:";
+      sResponse += sigCodeInUse;
+      sResponse += "</td><td>&nbsp;</td><td>1</td></tr><tr><td>Sendingspeed:</td><td>&nbsp;</td><td>";
+      sResponse += sigDuration;
+      sResponse +="us/bit</td></tr><tr><td>Sender A:</td><td class='";
+
+      if(enableSenderA == 1) {
+        enableSenderAprint = "on";
+      } else {
+        enableSenderAprint = "off";
+      }
+
+      sResponse += enableSenderAprint;
+      sResponse += "'>&nbsp;</td><td>";
+      sResponse += enableSenderAprint;
+      sResponse += "</td></tr><tr><td>Sender B:</td><td class='"
+
+      if(enableSenderB == 1) {
+        enableSenderBprint = "on";
+      } else {
+        enableSenderBprint = "off";
+      }
+
+      sResponse += enableSenderBprint;
+      sResponse += "'>&nbsp;</td><td>";
+      sResponse += enableSenderBprint;
+      sResponse += "</td></tr><tr><td>Automaticmode:</td><td class='";
+//AUTOMODE          on
+      sResponse += "'>&nbsp;</td><td>";
+//AUTOMODE          on
+      sResponse += "</td></tr></table></table></body></html>";
+
+
+
+
+
+      //sResponse += "<BR>Current chargetime: ";
+      //sResponse += workTimeChargeMins;
+      //sResponse += "min.<BR>Last charge : ";
+      //sResponse += lastChargeMins;
+      //sResponse += "min.<BR>Uptime perimeterloop = ";
+      //sResponse += workTimeMins;
+      //sResponse += "min.<br>Current flow in the perimeter loop = ";
+      //sResponse += PeriCurrent;
+      //sResponse += "mA<br>Voltage in the perimeterloop = ";
+      //sResponse += PeriBusVoltage;
 
 //    sResponse += "V<br>PeriShuntVoltage= ";      // Shows the PeriShuntVoltage
 //    sResponse += PeriShuntVoltage;
 //    sResponse += "m";
 
-      sResponse += "V<br>Chargecurrent = ";
-      sResponse += ChargeCurrentPrint;
-      sResponse += "mA<br>Chargevoltage = ";
-      sResponse += ChargeBusVoltage;
+      //sResponse += "V<br>Chargecurrent = ";
+      //sResponse += ChargeCurrentPrint;
+      //sResponse += "mA<br>Chargevoltage = ";
+      //sResponse += ChargeBusVoltage;
 
 //    sResponse += "V<br>ChargeShuntVoltage= ";      // Shows the ChargeShuntVoltage
 //    sResponse += ChargeShuntVoltage;
 //    sResponse += "m";
 
-      sResponse += "V<br>Sends one bit of the signal every :";
-      sResponse += sigDuration;
-      sResponse += "us<br>Signalcode = ";
-      sResponse += sigCodeInUse;
-      sResponse += "<br>Sender A : ";
-      sResponse += enableSenderA;
-      sResponse += "<br>Sender B : ";
-      sResponse += enableSenderB;
-      sResponse += "</H3></body></html>";
-
+      //sResponse += "V<br>Sends one bit of the signal every :";
+      //sResponse += sigDuration;
+      //sResponse += "us<br>Signalcode = ";
+      //sResponse += sigCodeInUse;
+      //sResponse += "<br>Sender A : ";
+      //sResponse += enableSenderA;
+      //sResponse += "<br>Sender B : ";
+      //sResponse += enableSenderB;
+      //sResponse += "</H3></body></html>";
+*/
       #ifdef SerialOutput
         Serial.println(sResponse);
       #endif
