@@ -28,7 +28,8 @@
                                       // Type your phone-number (e.g.: +49 170 123456789 --> 4917012345678) and your API-key in PersonalAccessData.h
 
 
-#define AUTO_START_SIGNAL 1           // Use to start sender when mower leave station
+bool AUTO_START_SIGNAL = 1;           // Use to start sender when mower leave station
+String AutoStartSignalPrint;
 #define USE_STATION 1                 // This station is used to charge the Mower. Then show the chargecurrent.
 #define USE_PERI_CURRENT 1            // Use Feedback for perimeter current measurements? (set to '0' if not connected!)
 //#define USE_BUTTON 0                // Use button to start mowing or send mower to station not finish
@@ -120,8 +121,8 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 volatile int step = 0;
 boolean enableSenderA = false;                          //OFF on start to autorise the reset
 boolean enableSenderB = false;                          //OFF on start to autorise the reset
-int enableSenderAprint;
-int enableSenderBprint;
+String enableSenderAprint = "";
+String enableSenderBprint = "";
 int timeSeconds = 0;
 unsigned long nextTimeControl = 0;
 unsigned long nextTimeSec = 0;
@@ -619,8 +620,8 @@ void setup() {
   u8x8.setFont(u8x8_font_5x8_f);                  // Screen font 
   u8x8.clear();
   #endif
-  timer = timerBegin(1000000);                // Interrupt things
-  timerAttachInterrupt(timer, &onTimer);
+  timer = timerBegin(0, 80, true);                // Interrupt things
+  timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, 104, true);
   timerAlarmEnable(timer);
   pinMode(pinIN1, OUTPUT);                        // Pinmodes
@@ -1066,8 +1067,8 @@ void loop() {
     if (req.indexOf("GET /?") != -1) {
       String sResponse;
 
-      sResponse = "<html><head><title>TeensySender Controlpanel v1.0</title><META HTTP-EQUIV='refresh' CONTENT='5'></head><style type="text/css">body{padding-left: 0em;font-family: Helvetica, Geneva, Arial, SunSans-Regular, sans-serif;color: rgb(125, 0, 0);background-color: rgb(170, 210, 255);}table.fullscreen{border: 1px solid rgb(125, 0, 0);}td.on{border-right: 1em solid rgb(0, 255, 0);}td.off{border-right: 1em solid rgb(255, 0, 0);}h1{font-family: Helvetica, Geneva, Arial, SunSans-Regular, sans-serif;}</style><body>";
-/*      sResponse +="<table class='fullscreen' width='100%'><tr><td><h1 align='center'>TeensySender Controlpanel</h1></td></tr><table align='center'><tr><td>Chargevoltage:</td><td>&nbsp;</td><td>";
+      sResponse = "<html><head><title>TeensySender Controlpanel v1.0</title><META HTTP-EQUIV='refresh' CONTENT='5'></head><style type='text/css'>body{padding-left: 0em;font-family: Helvetica, Geneva, Arial, SunSans-Regular, sans-serif;color: rgb(125, 0, 0);background-color: rgb(170, 210, 255);}table.fullscreen{border: 1px solid rgb(125, 0, 0);}td.on{border-right: 1em solid rgb(0, 255, 0);}td.off{border-right: 1em solid rgb(255, 0, 0);}h1{font-family: Helvetica, Geneva, Arial, SunSans-Regular, sans-serif;}</style><body>";
+      sResponse +="<table class='fullscreen' width='100%'><tr><td><h1 align='center'>TeensySender Controlpanel</h1></td></tr><table align='center'><tr><td>Chargevoltage:</td><td>&nbsp;</td><td>";
       sResponse += ChargeBusVoltage;
       sResponse += "V</td></tr><tr><td>Chargecurrent:</td><td>&nbsp;</td><td>";
       sResponse += ChargeCurrentPrint;
@@ -1092,7 +1093,7 @@ void loop() {
       sResponse += enableSenderAprint;
       sResponse += "'>&nbsp;</td><td>";
       sResponse += enableSenderAprint;
-      sResponse += "</td></tr><tr><td>Sender B:</td><td class='"
+      sResponse += "</td></tr><tr><td>Sender B:</td><td class='";
 
       if(enableSenderB == 1) {
         enableSenderBprint = "on";
@@ -1104,49 +1105,34 @@ void loop() {
       sResponse += "'>&nbsp;</td><td>";
       sResponse += enableSenderBprint;
       sResponse += "</td></tr><tr><td>Automaticmode:</td><td class='";
-//AUTOMODE          on
+      
+      if(AUTO_START_SIGNAL == 1) {
+        AutoStartSignalPrint = "on";
+      } else {
+        AutoStartSignalPrint = "off";
+      }
+
+      sResponse += AutoStartSignalPrint;
       sResponse += "'>&nbsp;</td><td>";
-//AUTOMODE          on
+      sResponse += AutoStartSignalPrint;
       sResponse += "</td></tr></table></table></body></html>";
 
+// Variablen
+// AUTO_START_SIGNAL
+// workTimeChargeMins;
+// lastChargeMins;
+// workTimeMins;
+// PeriCurrent;
+// PeriBusVoltage;
+// PeriShuntVoltage;
+// ChargeCurrentPrint;
+// ChargeBusVoltage;
+// ChargeShuntVoltage;
+// sigDuration;
+// sigCodeInUse;
+// enableSenderA;
+// enableSenderB;
 
-
-
-
-      //sResponse += "<BR>Current chargetime: ";
-      //sResponse += workTimeChargeMins;
-      //sResponse += "min.<BR>Last charge : ";
-      //sResponse += lastChargeMins;
-      //sResponse += "min.<BR>Uptime perimeterloop = ";
-      //sResponse += workTimeMins;
-      //sResponse += "min.<br>Current flow in the perimeter loop = ";
-      //sResponse += PeriCurrent;
-      //sResponse += "mA<br>Voltage in the perimeterloop = ";
-      //sResponse += PeriBusVoltage;
-
-//    sResponse += "V<br>PeriShuntVoltage= ";      // Shows the PeriShuntVoltage
-//    sResponse += PeriShuntVoltage;
-//    sResponse += "m";
-
-      //sResponse += "V<br>Chargecurrent = ";
-      //sResponse += ChargeCurrentPrint;
-      //sResponse += "mA<br>Chargevoltage = ";
-      //sResponse += ChargeBusVoltage;
-
-//    sResponse += "V<br>ChargeShuntVoltage= ";      // Shows the ChargeShuntVoltage
-//    sResponse += ChargeShuntVoltage;
-//    sResponse += "m";
-
-      //sResponse += "V<br>Sends one bit of the signal every :";
-      //sResponse += sigDuration;
-      //sResponse += "us<br>Signalcode = ";
-      //sResponse += sigCodeInUse;
-      //sResponse += "<br>Sender A : ";
-      //sResponse += enableSenderA;
-      //sResponse += "<br>Sender B : ";
-      //sResponse += enableSenderB;
-      //sResponse += "</H3></body></html>";
-*/
       #ifdef SerialOutput
         Serial.println(sResponse);
       #endif
@@ -1255,6 +1241,35 @@ void loop() {
       // Prepare the response
       String sResponse;
       sResponse = "NOW 50 microsecond signal duration";
+
+      // Send the response to the client
+      #ifdef SerialOutput
+        Serial.println(sResponse);
+      #endif
+      client.print(sResponse);
+      client.flush();
+    }
+    if (req.indexOf("GET /AutoMode/0") != -1) {
+      AUTO_START_SIGNAL = 0;
+ 
+      // Prepare the response
+      String sResponse;
+      sResponse = "NOW AutoMode is off";
+
+      // Send the response to the client
+      #ifdef SerialOutput
+        Serial.println(sResponse);
+      #endif
+      client.print(sResponse);
+      client.flush();
+    }
+    if (req.indexOf("GET /AutoMode/1") != -1) {
+      AUTO_START_SIGNAL = 1;
+ 
+      // Prepare the response
+      String sResponse;
+      sResponse = "NOW AutoMode is on";
+ 
  
       // Send the response to the client
       #ifdef SerialOutput
