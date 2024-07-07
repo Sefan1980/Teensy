@@ -4,16 +4,20 @@
   On your browser send :
   http://10.0.0.150/A0  *************** to stop the sender on wire connected on output A
   http://10.0.0.150/A1  *************** to start the sender on wire connected on output A
+
   http://10.0.0.150/B0  *************** to stop the sender on wire connected on output B
   http://10.0.0.150/B1  *************** to start the sender on wire connected on output B
 
   http://10.0.0.150/sigCode/2  ******** to change the sigcode in use possible value are 0,1,2,3,4 ,see sigcode list
+
   http://10.0.0.150/?  **************** to see the state of the sender
+
   http://10.0.0.150/sigDuration/104  ** to change the speed sender to 104 microsecondes
   http://10.0.0.150/sigDuration/50  *** to change the speed sender to 50 microsecondes
 
-  If USE_STATION : the sender start and stop automaticly if the mower is in the station or not
-
+  http://10.0.0.150/AutoMode/0 ******** 
+  http://10.0.0.150/AutoMode/1 ******** to start the sender automaticly
+  
   ------COLLABORATION FROM BERNARD, SASCHA AND STEFAN------
 */
 
@@ -30,9 +34,8 @@
 
 bool AUTO_START_SIGNAL = 1;           // Use to start sender when mower leave station
 String AutoStartSignalPrint;
-#define USE_STATION 1                 // This station is used to charge the Mower. Then show the chargecurrent.
+#define USE_STATION 1                 // if the station is used to charge the Mower. Then show the chargecurrent.
 #define USE_PERI_CURRENT 1            // Use Feedback for perimeter current measurements? (set to '0' if not connected!)
-//#define USE_BUTTON 0                // Use button to start mowing or send mower to station not finish
 //#define SerialOutput 1              // Show serial textmessages for debugging
 #define Screen 1                      // Screen or not?
 
@@ -53,11 +56,9 @@ String AutoStartSignalPrint;
 
 // At the PCB is a connector for a 2-color LED with common cathode(-). (Attention: The Matrix Mow800 has a LED with common anode(+)!!!)
 #define pinGreenLED 25                // Station is ready!
-
-// Battery is charging if ChargeCurrent > LoadingThreshold
 #define pinRedLED 26                  // Battery is charging
 
-#define VER "ESP32Sender 06.03.24"    // code version
+#define VER "ESP32Sender 07.07.24"    // code version
 
 //********************* includes **********************************
 #include <Wire.h>
@@ -116,8 +117,7 @@ byte sigCodeInUse = 1;                                  // 1 is the original ard
 int sigDuration = 104;                                  // send the bits each 104 microsecond (Also possible 50)
 int8_t sigcode_norm[128];
 int sigcode_size;
-hw_timer_t* timer = NULL;
-portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+hw_timer_t* timer = NULL;                               // Variable named timer of the type hw_timer_t in order to configure the timer
 volatile int step = 0;
 boolean enableSenderA = false;                          //OFF on start to autorise the reset
 boolean enableSenderB = false;                          //OFF on start to autorise the reset
@@ -197,8 +197,7 @@ void sendWhatsappMessage(String message){
 
 
 //********************* SIGNAL MANAGEMENT **********************************
-void IRAM_ATTR onTimer() {
-  portENTER_CRITICAL_ISR(&timerMux);
+void IRAM_ATTR onTimer() {                    // Interrupt Service Routine (ISR) - This ISR will be executed when the timer interrupt occurs
   if (enableSenderA) {
 
     if (sigcode_norm[step] == 1) {
@@ -208,19 +207,6 @@ void IRAM_ATTR onTimer() {
     } else if (sigcode_norm[step] == -1) {
       digitalWrite(pinIN1, HIGH);
       digitalWrite(pinIN2, LOW);
-
-    } else {
-      #ifdef SerialOutput
-        Serial.println("ERROR");
-      #endif      
-
-      #ifdef Screen
-        u8x8.clear();
-        u8x8.setCursor(5,5);
-        u8x8.print("ERROR");      
-        delay(5000);
-      #endif
-      //digitalWrite(pinEnableA, LOW);
     }
     step++;
     if (step == sigcode_size) {
@@ -237,25 +223,12 @@ void IRAM_ATTR onTimer() {
       digitalWrite(pinIN3, HIGH);
       digitalWrite(pinIN4, LOW);
 
-    } else {
-        #ifdef SerialOutput
-        Serial.println("ERROR");
-      #endif
-
-      #ifdef Screen
-        u8x8.clear();
-        u8x8.setCursor(5,5);
-        u8x8.print("ERROR");
-        delay(5000);
-      #endif
-      //digitalWrite(pinEnableA, LOW);
     }
     step++;
     if (step == sigcode_size) {
       step = 0;
     }
   }
-  portEXIT_CRITICAL_ISR(&timerMux);
 }
 // End of Signalmanagement
 
@@ -402,7 +375,7 @@ static void openAP()  {
   #endif
 
   WiFi.softAPConfig (staticIP, gateway, subnet);
-  if (!WiFi.softAP(ssid, password)) {
+  if (!WiFi.softAP("TeensySenderAP", password)) {
     Serial.println("AP creation failed.");
     while(1);
   }
@@ -482,7 +455,7 @@ static void ScanNetwork() {
     delay(2000);
     if ((!enableSenderA) && (!enableSenderB)) ESP.restart();  // do not reset if sender is ON
   }
-  if (n == -2)    //bug in esp32 if wifi is lost many time the esp32 fail to autoreconnect,maybe solve in other firmware ???????
+  if (n == -2)    //bug in esp32 if wifi is lost many time the esp32 fail to autoreconnect, maybe solve in other firmware ???????
   {
     
     #ifdef Screen
@@ -620,10 +593,10 @@ void setup() {
   u8x8.setFont(u8x8_font_5x8_f);                  // Screen font 
   u8x8.clear();
   #endif
-  timer = timerBegin(0, 80, true);                // Interrupt things
-  timerAttachInterrupt(timer, &onTimer, true);
-  timerAlarmWrite(timer, 104, true);
-  timerAlarmEnable(timer);
+  timer = timerBegin(0, 80, true);                // timerBegin([hardware timer 0-3], [prescaler: ESP32 is at 80MHz. 80Mhz / 80(prescaler) = 1MHz = Microseconds], [count up = true, count down 0 false])
+  timerAttachInterrupt(timer, &onTimer, true);    // Attach the timer to the ISR onTimer
+  timerAlarmWrite(timer, 104, true);              // specify the counter value
+  timerAlarmEnable(timer);                        // enable the timer interrupt
   pinMode(pinIN1, OUTPUT);                        // Pinmodes
   pinMode(pinIN2, OUTPUT);
   pinMode(pinEnableA, OUTPUT);
