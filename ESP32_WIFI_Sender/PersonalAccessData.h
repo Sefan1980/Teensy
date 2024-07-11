@@ -1,9 +1,10 @@
 
 
 //********************* WLAN Settings **********************************
-const char* ssid = "WLAN-SSID";                 // put here your acces point ssid -->  If you use the station an an Accesspoint, put the SSID for your AP here. The SSID for AP should not match an existing network.
-const char* password = "PASSWORD";         // put here the password - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password here.
-
+const char* ssid = "Sefan WLAN 2,4GHz";               // SSID for STA mode
+const char* ssidAP = "TeensySenderAP";        // Name of the AccesPoint
+const char* password = "StefanJaninaRenkaDeik";            // min. 7 chars
+const char* passwordAP = "123456789";         // could be blank
 
 //********************* AhatsApp Settings **********************************
 String mobile_number = "491701234567";                  // Type here your phone-number (e.g.: +49 170 123456789 --> 4917012345678)
