@@ -2,6 +2,9 @@
   WIFI Communicating sender with 2 possible loops
   Adjust IP according to your ESP32 value 10.0.0.150 in this example
   On your browser send :
+
+  http://10.0.0.150 ******************* HTML-Site of the sender, with settings.
+
   http://10.0.0.150/A0 **************** to stop the sender on wire connected on output A
   http://10.0.0.150/A1 **************** to start the sender on wire connected on output A
 
@@ -9,8 +12,6 @@
   http://10.0.0.150/B1 **************** to start the sender on wire connected on output B
 
   http://10.0.0.150/sigCode1 ********** to change the sigcode in use possible value are 0,1,2,3,4 ,see sigcode list
-
-  http://10.0.0.150 ******************* HTML-Site of the sender
 
   http://10.0.0.150/sigDuration104 **** to change the speed sender to 104 microsecondes
   http://10.0.0.150/sigDuration50 ***** to change the speed sender to 50 microsecondes
@@ -32,9 +33,9 @@
                                       // Type your phone-number (e.g.: +49 170 123456789 --> 4917012345678) and your API-key in PersonalAccessData.h
 
 
-#define USE_STATION 0                 // if the station is used to charge the Mower. Then show the chargecurrent. (set to '0' if not connected)
-#define USE_PERI_CURRENT 0            // Use Feedback for perimeter current measurements? (set to '0' if not connected!)
-#define SerialOutput 1              // Show serial textmessages for debugging
+#define USE_STATION 1                 // if the station is used to charge the Mower. Then show the chargecurrent. (set to '0' if not connected)
+#define USE_PERI_CURRENT 1            // Use Feedback for perimeter current measurements? (set to '0' if not connected!)
+#define SerialOutput 0              // Show serial textmessages for debugging
 #define Screen 1                      // Screen or not?
 
 #define WORKING_TIMEOUT_MINS 300      // Timeout for perimeter switch-off if robot not in station (minutes) - If AUTO_START_SIGNAL is active, this setting does not work!
@@ -91,10 +92,10 @@ U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 // put your SSID and PASS in the PersonalAccessData.h
 
 // Select one of them
-#define ACCESS_POINT 1
-#define WIFI_CONNECTION 0
+#define ACCESS_POINT 0
+#define WIFI_CONNECTION 1
 
-IPAddress staticIP(192, 168, 178, 61);                 // put here the static IP. Used for AP and STA mode!
+IPAddress staticIP(192, 168, 178, 222);                 // put here the static IP. Used for AP and STA mode!
 IPAddress gateway(192, 168, 178, 1);                    // put here the gateway (IP of your router)
 IPAddress subnet(255, 255, 255, 0);                     // for AP & STA mode
 IPAddress dns(192, 168, 178, 1);                        // put here the dns (IP of your router)
@@ -148,8 +149,8 @@ float ChargeShuntVoltage = 0.0;
   If the Mower is in station and fully charged, the current should be between
   PeriOnOffThreshold(3mA) and ChargeThreshold(10mA)
 
-  If Perimeter starts and mower is in the station, change ChargeThreshold to 0. So you can see the original ChargeCurrent value at http://Your-IP/?
-  If mower is outside, ChargeCurrent should be 0
+  If Perimeter starts and mower is in the station, change ChargeThreshold to 0. So you can see the original ChargeCurrent value at http://Your-IP
+  If mower is outside, ChargeCurrent should be shown as 0
 */
 float ChargeThreshold = 10.0;               // in mA. If the Chargecurrent is below this value, at  the Display shows "0mA" 
 float PeriOnOffThreshold = 2.0;             // if ChargeCurrent is below this value, the perimeterloop starts working
@@ -861,7 +862,7 @@ void loop() {
       Serial.println(ChargeBusVoltage);
       #endif
 
-      if (ChargeCurrent > PeriOnOffThreshold) {   // mower is into the station ,in my test 410 ma are drained so possible to stop sender - When ist fully loaded the current is about 4mA.
+      if (ChargeCurrent > PeriOnOffThreshold && AUTO_START_SIGNAL) {   // mower is into the station ,in my test 410 ma are drained so possible to stop sender - When ist fully loaded the current is about 4mA.
                                                   // So keep keep the value small to avoid an activation from the perimeterwire before the mower starts.
         enableSenderA = false;
         enableSenderB = false;
@@ -888,7 +889,7 @@ void loop() {
             mowerIsWorking = 1;
             sendWhatsappMessage("Mower is going to work!");          // Code for Whatsapp
           }
-          if (!enableSenderB) {
+          if (!enableSenderB && AUTO_START_SIGNAL) {
             enableSenderA = true;
             digitalWrite(pinEnableA, HIGH);
             digitalWrite(pinIN1, LOW);
@@ -1201,10 +1202,10 @@ void loop() {
             client.println("<tr>");
             client.println("<td>Sender A:</td>");
 
-              if(enableSenderA == 1) {
+              if(enableSenderA == true) {
               enableSenderAprint = "on";
               linktext = "/A0";
-            } else {
+            } else if (enableSenderA == false) {
               enableSenderAprint = "off";
               linktext = "/A1";
             }
