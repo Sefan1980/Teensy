@@ -142,7 +142,7 @@ float ChargeShuntVoltage = 0.0;
   If mower is outside, ChargeCurrent should be 0
 */
 float ChargeThreshold = 10.0;               // in mA. If the Chargecurrent is below this value, at  the Display shows "0mA" 
-float PeriOnOffThreshold = 2.0;             // if ChargeCurrent is below this value, the perimeterloop starts working
+float PeriOnOffThreshold = 1.5;             // if ChargeCurrent is below this value, the perimeterloop starts working
 
 //*********************  Sigcode list *********************************************
 // must be multiple of 2 !
@@ -839,7 +839,7 @@ void loop() {
       ChargeShuntVoltage = InaCharge.getShuntVoltage_mV();
       ChargeCurrent = InaCharge.getCurrent_mA();
 
-      if (ChargeCurrent > PeriOnOffThreshold) {  //Just for charge LED
+      if (ChargeCurrent > ChargeThreshold) {  //Just for charge LED
         digitalWrite(pinGreenLED, LOW);
         digitalWrite(pinRedLED, HIGH);
       } else  {
