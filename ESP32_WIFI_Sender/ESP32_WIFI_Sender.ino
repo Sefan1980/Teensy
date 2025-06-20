@@ -17,6 +17,33 @@
   ------COLLABORATION FROM BERNARD, SASCHA AND STEFAN------
 */
 
+
+//********************* includes **********************************
+#include <FS.h>         //this needs to be first, or it all crashes and burns...
+#include <SPIFFS.h>
+#include <ArduinoJson.h>
+#include <WiFiManager.h>
+WiFiManager wm;
+#include <HTTPClient.h>
+#include "PersonalAccessData.h"       // Here is your SSID and your password for WLAN access and your phonenumber and the API for Whatsapp-messaging
+#include <WiFiClient.h>
+#include <HTTPClient.h>
+#include <UrlEncode.h>
+#include <INA226_WE.h>                // INA226_WE library from Wolfgang Ewald
+#include <ArduinoOTA.h>             // ArduinoOTA from Juraj Andrassy
+
+#include <U8x8lib.h>                  // U8g2 from Oliver Kraus
+//********************* Display Settings **********************************
+// Please UNCOMMENT one of the contructor lines below
+// U8x8 Contructor List 
+// The complete list is available here: https://github.com/olikraus/u8g2/wiki/u8x8setupcpp
+// Please update the pin numbers according to your setup. Use U8X8_PIN_NONE if the reset pin is not connected
+ //U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 	      
+//U8X8_SSD1306_128X64_ALT0_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 	      // same as the NONAME variant, but may solve the "every 2nd line skipped" problem
+U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
+// End of constructor list
+
+
 //********************* defines **********************************
 // Comment the lines out, you don't need!
 #define OTAUpdates 1                  // OTA Updates
@@ -33,6 +60,7 @@
 #define USE_PERI_CURRENT 1            // Use Feedback for perimeter current measurements? (set to '0' if not connected!)
 //#define USE_BUTTON 0                // Use button to start mowing or send mower to station not finish
 //#define SerialOutput 1              // Show serial textmessages for debugging
+bool debug = true;                    // for serial output (Wifimanager)
 #define Screen 1                      // Screen or not?
 
 #define WORKING_TIMEOUT_MINS 300      // Timeout for perimeter switch-off if robot not in station (minutes) - If AUTO_START_SIGNAL is active, this setting does not work!
@@ -51,50 +79,20 @@
 //#define pinLDR 32                   // Not in use (Light Sensor)
 
 // At the PCB is a connector for a 2-color LED with common cathode(-). (Attention: The Matrix Mow800 has a LED with common anode(+)!!!)
-#define pinGreenLED 25                // Station is ready!
+#define pinGreenLED 25                                  // Station is ready!
 
 // Battery is charging if ChargeCurrent > LoadingThreshold
-#define pinRedLED 26                  // Battery is charging
+#define pinRedLED 26                                    // Battery is charging
 
-#define VER "ESP32Sender 06.03.24"    // code version
-
-//********************* includes **********************************
-#include <Wire.h>
-#include "PersonalAccessData.h"       // Here is your SSID and your password for WLAN access and your phonenumber and the API for Whatsapp-messaging
-#include <WiFi.h>
-#include <WiFiClient.h>
-#include <HTTPClient.h>
-#include <UrlEncode.h>
-#include <WiFiAP.h>
-#include <INA226_WE.h>                // INA226_WE library from Wolfgang Ewald
-#ifdef OTAUpdates
-  #include <ESPmDNS.h>
-  #include <WiFiUdp.h>
-  #include <ArduinoOTA.h>             // ArduinoOTA from Juraj Andrassy
-#endif
-
-#include <U8x8lib.h>                  // U8g2 from Oliver Kraus
-//********************* Display Settings **********************************
-// Please UNCOMMENT one of the contructor lines below
-// U8x8 Contructor List 
-// The complete list is available here: https://github.com/olikraus/u8g2/wiki/u8x8setupcpp
-// Please update the pin numbers according to your setup. Use U8X8_PIN_NONE if the reset pin is not connected
- //U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 	      
-//U8X8_SSD1306_128X64_ALT0_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 	      // same as the NONAME variant, but may solve the "every 2nd line skipped" problem
-U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
-// End of constructor list
-
+#define VER "ESP32Sender 19.06.25"                      // code version
 
 //********************* WLAN Settings **********************************
                                                         // put your acces point ssid in the PersonalAccessData.h -->  If you use the station an an Accesspoint, put the SSID for your AP there. The SSID for AP should not match an existing network.
                                                         // put your password in the PersonalAccessData.h - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password there.
-IPAddress staticIP(192, 168, 178, 222);                 // put here the static IP --> Used for AP too!
-IPAddress gateway(192, 168, 178, 1);                    // put here the gateway (IP of your router)
-IPAddress subnet(255, 255, 255, 0);
-IPAddress dns(192, 168, 178, 1);                        // put here the dns (IP of your router)
+char static_ip[16] = "192.168.178.124";                       // put here the static IP --> Used for AP too!
+char static_gw[16] = "192.168.178.1";                        // put here the gateway (IP of your router)
+char static_sn[16] = "255.255.255.0";
 WiFiServer server(80);
-bool APconnected = false;
-
 
 //********************* INA226 Settings **********************************
 INA226_WE InaPeri = INA226_WE(0x40);                    // 0x40 = without bridge
@@ -107,6 +105,8 @@ float rangeCharge = 4.0;
 
 
 //********************* other **********************************
+
+
 bool WORKING_TIMEOUT = 0;
 bool mowerIsWorking = 0;                                // Code for Whatsapp
 int column = 2;                                         //used in function scanNetwork. It's for the screen. (Print SSID for each network found)
@@ -133,6 +133,8 @@ float ChargeCurrent = 0.0;
 float ChargeCurrentPrint = 0.0;
 float ChargeBusVoltage = 0.0;
 float ChargeShuntVoltage = 0.0;
+bool shouldSaveConfig = false;  // flag for saving data
+bool wm_nonblocking = false;    // the captive portal blocks the loop
 
 /*
   If the Mower is in station and fully charged, the current should be between
@@ -331,239 +333,8 @@ void changeArea(byte areaInMowing) {
     Serial.println(sigcode_size);
     delay(2000);
   #endif
-
 }
 // END ChangeArea
-
-//********************* CONNECTION **********************************
-void connection() {
-  #ifdef SerialOutput
-    Serial.println();
-    Serial.print("Connecting to ");
-    Serial.println(ssid);
-  #endif
-
-  #ifdef Screen
-    u8x8.clearDisplay();
-    u8x8.setCursor(0, 0);
-    u8x8.println("Connecting to:");
-    u8x8.print(ssid);
-    delay(1500);
-  #endif
-
-  WiFi.begin(ssid, password);
-  for (int i = 0; i < 60; i++) {
-    if (WiFi.status() != WL_CONNECTED) {
-
-      #ifdef SerialOutput
-        Serial.println("Try connecting");
-      #endif
-      
-      #ifdef Screen
-        u8x8.setCursor(0,3);
-        u8x8.print("CONNECTING");
-      #endif      
-      delay(500);
-    }
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    #ifdef SerialOutput
-      Serial.println("WiFi connected.");
-      Serial.println("IP address: ");
-      Serial.println(WiFi.localIP());
-    #endif    
-    
-    #ifdef Screen
-      u8x8.clear();
-      u8x8.setCursor(0,0);
-      u8x8.print("WiFi Connected");
-      u8x8.setCursor(0,2);
-      u8x8.print("IP address:");
-      u8x8.setCursor(0,4);
-      u8x8.print(WiFi.localIP());
-      delay(1000);
-    #endif
-   
-     server.begin();
-  }
-}
-// END Connection
-
-
-//********************* openAP **********************************
-static void openAP()  {
-
-  #ifdef SerialOutput
-  Serial.print("...open Accesspoint.");
-  #endif
-
-  WiFi.softAPConfig (staticIP, gateway, subnet);
-  if (!WiFi.softAP(ssid, password)) {
-    Serial.println("AP creation failed.");
-    while(1);
-  }
-  IPAddress myIP = WiFi.softAPIP();
-  
-  #ifdef SerialOutput
-  Serial.println("...Access!");
-  Serial.print("AP IP address: ");
-  Serial.println(myIP);
-  #endif
-
-  #ifdef Screen
-    u8x8.clear();
-    u8x8.setCursor(0, 1);
-    u8x8.print("AP-IP-addr:");
-    u8x8.setCursor(0, 3);
-    u8x8.print(myIP);
-  #endif
-
-  server.begin();
-  
-  #ifdef SerialOutput
-    Serial.println("Server started");
-  #endif
-
-  #ifdef Screen
-  u8x8.setCursor(0, 5);
-  u8x8.print("Server started");
-  #endif
-  APconnected = true;
-  delay(2000);
-}  
-// END openAP
-
-
-//********************* SCANNETWORK **********************************
-static void ScanNetwork() {
-
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  bool findNetwork = false;
-  #ifdef Screen
-    u8x8.clear();
-    u8x8.setCursor(0, 0);
-    if (!firstStart) {
-      u8x8.println("Hotspot Lost!");
-    }
-    u8x8.print("Scan Network");
-  #endif
-
-  #ifdef SerialOutput
-    if (!firstStart) {
-      Serial.println("Hotspot Lost");
-    }
-    Serial.println("Scan Network");
-  #endif
-  
-  firstStart = false;
-  delay(1000);  // wait until all is disconnect
-  int n = WiFi.scanNetworks();
-  if (n == -1) {
-    
-    #ifdef Screen
-      u8x8.setCursor(0, 1);
-      u8x8.print("Scan running...");
-      u8x8.setCursor(0, 2);
-      u8x8.print("Need Reset? ");
-      u8x8.setCursor(0, 3);
-      u8x8.print("If sender is OFF");
-    #endif
-    #ifdef SerialOutput
-      Serial.println("Scan running...");
-      Serial.println("Need reset?");
-      Serial.println("If sender is OFF");
-    #endif
-        
-    delay(2000);
-    if ((!enableSenderA) && (!enableSenderB)) ESP.restart();  // do not reset if sender is ON
-  }
-  if (n == -2)    //bug in esp32 if wifi is lost many time the esp32 fail to autoreconnect,maybe solve in other firmware ???????
-  {
-    
-    #ifdef Screen
-      u8x8.setCursor(0, 1);
-      u8x8.print("Scan Fail.");
-      u8x8.setCursor(0, 2);
-      u8x8.print("Need Reset? ");
-      u8x8.setCursor(0, 3);
-      u8x8.print("If sender is Off");
-    #endif
-    #ifdef SerialOutput
-      Serial.println("Scan fail.");
-      Serial.println("Need reset?");
-      Serial.println("If sender is OFF");
-    #endif
-        
-    delay(3000);
-    if ((!enableSenderA) && (!enableSenderB)) ESP.restart();
-  }
-  if (n == 0) {
-
-    #ifdef Screen
-      u8x8.setCursor(0, 2);
-      u8x8.print("No networks.");
-    #endif
-    #ifdef SerialOutput
-      Serial.println("No networks.");
-    #endif
-  }
-
-  if (n > 0) {
-    
-    #ifdef SerialOutput
-      Serial.print("Find ");
-      Serial.println(n);
-    #endif
-
-    #ifdef Screen
-      u8x8.clearDisplay();
-      u8x8.setCursor(0, 0);
-      u8x8.print("Find ");u8x8.println(n);u8x8.println(" ");
-    #endif
-    
-    delay(1000);
-
-    for (int i = 0; i < n; ++i) {   // Print SSID for each network found
-      char currentSSID[64];
-      char printCurrentSSID[16];
-      WiFi.SSID(i).toCharArray(currentSSID, 64);
-      WiFi.SSID(i).toCharArray(printCurrentSSID, 16);
-      #ifdef SerialOutput
-        Serial.print("Find Wifi : ");
-        Serial.println(currentSSID);
-      #endif      
-      
-      #ifdef Screen
-        if(column >= 8) {
-          column = 2;
-          delay(2000);
-          u8x8.clearDisplay();
-          u8x8.setCursor(0, 0);
-          u8x8.print("Find ");u8x8.println(n);u8x8.println(" ");
-        }
-        u8x8.setCursor(0, column);
-        u8x8.print(printCurrentSSID);
-        delay(500);
-        column++;
-      #endif
-
-      if (String(currentSSID) == ssid) {
-        findNetwork = true;
-        //i = 200;  //to avoid loop again when connected
-      }
-    }
-    delay(2000);
-    if (findNetwork == true)  {
-      connection();
-    } else
-    {
-      openAP();
-    }
-  }
-}
-// END ScanNetwork
 
 //********************* STATICSCREENPARTS **********************************
 void StaticScreenParts() {
@@ -604,10 +375,21 @@ void StaticScreenParts() {
 }
 // END StaticScreenParts
 
+//********************* SaveConfigCallback **********************************
+void saveConfigCallback () {  //callback notifying us of the need to save config
+  if (debug) Serial.println("Should save config");
+  shouldSaveConfig = true;
+}
+// END SaveConfigCallback
+
 //********************* SETUP **********************************
 void setup() {
   Serial.begin(115200);                           // Serial interface start
   Wire.begin(I2C_SDA, I2C_SCL);                   // I2C interface start
+
+  //reset settings - for testing
+  //wm.resetSettings();
+  //SPIFFS.format();
 
   InaPeri.init();                                 // initialize INA226 for perimetermeasuring 
   InaCharge.init();                               // initialize INA226 for chargemeasuring
@@ -617,10 +399,9 @@ void setup() {
   u8x8.setFont(u8x8_font_5x8_f);                  // Screen font 
   u8x8.clear();
   #endif
-  timer = timerBegin(0, 80, true);                // Interrupt things
-  timerAttachInterrupt(timer, &onTimer, true);
-  timerAlarmWrite(timer, 104, true);
-  timerAlarmEnable(timer);
+  timer = timerBegin(1000000);
+  timerAttachInterrupt(timer, &onTimer);
+  timerAlarm(timer, 104, true, 0);
   pinMode(pinIN1, OUTPUT);                        // Pinmodes
   pinMode(pinIN2, OUTPUT);
   pinMode(pinEnableA, OUTPUT);
@@ -657,17 +438,71 @@ void setup() {
   }
 
   //------------------------  WIFI parts  ----------------------------------------
-  // Set WiFi to station mode and disconnect from an AP if it was previously connected
-  if (WiFi.config(staticIP, gateway, subnet, dns, dns) == false) {
-    
-    #ifdef SerialOutput
-      Serial.println("WIFI Configuration failed.");
-    #endif
-  }  
   WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  delay(100);
-  if ((WiFi.status() != WL_CONNECTED)) ScanNetwork();
+  if (SPIFFS.begin()) {   // read configuration from FS json
+    if (SPIFFS.exists("/config.json")) {  //file exists, reading and loading
+      File configFile = SPIFFS.open("/config.json", "r");   // open file
+      if (configFile) {
+        size_t size = configFile.size();  // allocate a buffer to store contents of the file.
+        std::unique_ptr<char[]> buf(new char[size]);
+        configFile.readBytes(buf.get(), size);
+        DynamicJsonDocument json(1024);
+        auto deserializeError = deserializeJson(json, buf.get());
+        serializeJson(json, Serial);
+        if ( ! deserializeError ) {
+          if (json["ip"]) {
+            if (debug) Serial.println("setting custom ip from config");
+            strcpy(static_ip, json["ip"]);
+            strcpy(static_gw, json["gateway"]);
+            strcpy(static_sn, json["subnet"]);
+          } else {
+            if (debug) Serial.println("no custom ip in config");
+          }
+        } else {
+          if (debug) Serial.println("failed to load json config");
+        }
+      }
+    }
+  } else {
+    if (debug) Serial.println("failed to mount FS");
+  }   // end read
+
+  wm.setSaveConfigCallback(saveConfigCallback);    //set config save notify callback
+  
+  IPAddress _ip, _gw, _sn;    //set static ip
+  _ip.fromString(static_ip);
+  _gw.fromString(static_gw);
+  _sn.fromString(static_sn);
+  wm.setSTAStaticIPConfig(_ip, _gw, _sn);
+
+  if (!wm.autoConnect("MowerAP","12345678")) { // The password should have at least 8 characters.
+    if (debug) Serial.println("Failed to connect - ESP32 restart!");
+    delay(3000);
+    ESP.restart();
+    delay(5000);
+  } 
+  else {
+    if (debug) Serial.println("connected :)");
+  }
+  
+  if (shouldSaveConfig) {   //save the custom parameters to FS
+    if (debug) Serial.println("saving config");
+    DynamicJsonDocument json(1024);
+    json["ip"] = WiFi.localIP().toString();
+    json["gateway"] = WiFi.gatewayIP().toString();
+    json["subnet"] = WiFi.subnetMask().toString();
+    File configFile = SPIFFS.open("/config.json", "w");
+    if (!configFile) {
+      if (debug) Serial.println("failed to open config file for writing");
+    }
+    serializeJson(json, Serial);
+    serializeJson(json, configFile);
+    configFile.close();
+  }   //end save
+
+  server.begin();
+
+
 
   //------------------------  SCREEN parts  ----------------------------------------
   #ifdef Screen            // 16x8 (??16x9??)
@@ -790,7 +625,7 @@ void loop() {
       }
     }
 
-    if ((WiFi.status() != WL_CONNECTED && APconnected == false)) ScanNetwork();
+ //   if ((WiFi.status() != WL_CONNECTED && APconnected == false)) ScanNetwork();
 
     if (workTimeMins >= WORKING_TIMEOUT_MINS) {
       // switch off perimeter
@@ -1186,7 +1021,7 @@ void loop() {
     }
     if (req.indexOf("GET /sigDuration/104") != -1) {
       sigDuration = 104;
-      timerAlarmWrite(timer, 104, true);
+      timerAlarm(timer, 104, true, 0);
  
       // Prepare the response
       String sResponse;
@@ -1202,7 +1037,7 @@ void loop() {
 
     if (req.indexOf("GET /sigDuration/50") != -1) {
       sigDuration = 50;
-      timerAlarmWrite(timer, 50, true);
+      timerAlarm(timer, 50, true, 0);
  
       // Prepare the response
       String sResponse;
