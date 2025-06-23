@@ -24,7 +24,6 @@
 #include <ArduinoJson.h>
 #include <WiFiManager.h>
 WiFiManager wm;
-#include <HTTPClient.h>
 #include "PersonalAccessData.h"       // Here is your SSID and your password for WLAN access and your phonenumber and the API for Whatsapp-messaging
 #include <WiFiClient.h>
 #include <HTTPClient.h>
@@ -87,11 +86,10 @@ bool debug = true;                    // for serial output (Wifimanager)
 #define VER "ESP32Sender 19.06.25"                      // code version
 
 //********************* WLAN Settings **********************************
-                                                        // put your acces point ssid in the PersonalAccessData.h -->  If you use the station an an Accesspoint, put the SSID for your AP there. The SSID for AP should not match an existing network.
-                                                        // put your password in the PersonalAccessData.h - min. 7 chars --> If you use the station as an Accesspoint, put the AP-password there.
-char static_ip[16] = "192.168.178.124";                       // put here the static IP --> Used for AP too!
-char static_gw[16] = "192.168.178.1";                        // put here the gateway (IP of your router)
-char static_sn[16] = "255.255.255.0";
+                                                        
+char static_ip[16] = "192.168.178.124";                 // default IP
+char static_gw[16] = "192.168.178.1";                   // default gateway
+char static_sn[16] = "255.255.255.0";                   // default subnet
 WiFiServer server(80);
 
 //********************* INA226 Settings **********************************
