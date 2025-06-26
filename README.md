@@ -15,5 +15,5 @@ original you'll find here --> https://github.com/Boilevin/Teensy
   2 new variables (ChargeThreshold, PeriOnOffThreschold) for to set correct values
   for states (mower in station and idle, mower is charging and mower is outside).  
 
- ESP32_WiFi_and_BT_Bridge is a firmware for the TeensyMower project. The PFOD app or the Arduremote app is required to access the mower.
+ ESP32_WiFi_and_BT_Bridge is a firmware for the TeensyMower and also for the Ardumower project. The PFOD app or the Arduremote app is required to access the mower.
  
