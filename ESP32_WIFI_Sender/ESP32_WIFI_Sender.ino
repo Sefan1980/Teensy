@@ -1,35 +1,33 @@
 /*
   WIFI Communicating sender with 2 possible loops
   Adjust IP according to your ESP32 value 10.0.0.150 in this example
-  On your browser send :
-  http://10.0.0.150/A0  *************** to stop the sender on wire connected on output A
-  http://10.0.0.150/A1  *************** to start the sender on wire connected on output A
-  http://10.0.0.150/B0  *************** to stop the sender on wire connected on output B
-  http://10.0.0.150/B1  *************** to start the sender on wire connected on output B
-
-  http://10.0.0.150/sigCode/2  ******** to change the sigcode in use possible value are 0,1,2,3,4 ,see sigcode list
-  http://10.0.0.150/?  **************** to see the state of the sender
-  http://10.0.0.150/sigDuration/104  ** to change the speed sender to 104 microsecondes
-  http://10.0.0.150/sigDuration/50  *** to change the speed sender to 50 microsecondes
-
-  If USE_STATION : the sender start and stop automaticly if the mower is in the station or not
+  On your browser type:
+  http://10.0.0.150  **************** This page updates every 5 seconds to see the actual state of the sender - you could change the settings by clicking on it like shown below. This Page refreshes every 5 seconds.
+  
+  Signalcode:     --> click at the number to change the signal
+  Sendingspeed:   -->	click at the number to change the signal sending speed
+  Sender A:       --> click at on or off to change the state
+  Sender B:       --> click at on or off to change the state
+  Automaticmode:  --> click at on or off to change the state
+  
 
   ------COLLABORATION FROM BERNARD, SASCHA AND STEFAN------
 */
 
 
 //********************* includes **********************************
-#include <FS.h>         //this needs to be first, or it all crashes and burns...
+#include <FS.h>                       //this needs to be first, or it all crashes and burns...
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
 #include <WiFiManager.h>
 WiFiManager wm;
-#include "PersonalAccessData.h"       // Here is your SSID and your password for WLAN access and your phonenumber and the API for Whatsapp-messaging
+#include "PersonalAccessData.h"       // Here is your phonenumber and the API for Whatsapp-messaging
 #include <WiFiClient.h>
 #include <HTTPClient.h>
 #include <UrlEncode.h>
 #include <INA226_WE.h>                // INA226_WE library from Wolfgang Ewald
-#include <ArduinoOTA.h>             // ArduinoOTA from Juraj Andrassy
+#include <ArduinoOTA.h>               // ArduinoOTA from Juraj Andrassy
+
 
 #include <U8x8lib.h>                  // U8g2 from Oliver Kraus
 //********************* Display Settings **********************************
@@ -54,12 +52,12 @@ U8X8_SH1106_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
                                       // Type your phone-number (e.g.: +49 170 123456789 --> 4917012345678) and your API-key in PersonalAccessData.h
 
 
-#define AUTO_START_SIGNAL 1           // Use to start sender when mower leave station
+bool AUTO_START_SIGNAL = 1;           // Use to start sender when mower leave station
 #define USE_STATION 1                 // This station is used to charge the Mower. Then show the chargecurrent.
 #define USE_PERI_CURRENT 1            // Use Feedback for perimeter current measurements? (set to '0' if not connected!)
 //#define USE_BUTTON 0                // Use button to start mowing or send mower to station not finish
 //#define SerialOutput 1              // Show serial textmessages for debugging
-bool debug = true;                    // for serial output (Wifimanager)
+bool debug = false;                    // for serial output (Wifimanager)
 #define Screen 1                      // Screen or not?
 
 #define WORKING_TIMEOUT_MINS 300      // Timeout for perimeter switch-off if robot not in station (minutes) - If AUTO_START_SIGNAL is active, this setting does not work!
@@ -83,14 +81,15 @@ bool debug = true;                    // for serial output (Wifimanager)
 // Battery is charging if ChargeCurrent > LoadingThreshold
 #define pinRedLED 26                                    // Battery is charging
 
-#define VER "ESP32Sender 19.06.25"                      // code version
+#define VER "ESP32Sender 3.0 - 26.06.25"                      // code version
 
-//********************* WLAN Settings **********************************
-                                                        
+
+//********************* WLAN Settings **********************************                                                       
 char static_ip[16] = "192.168.178.124";                 // default IP
 char static_gw[16] = "192.168.178.1";                   // default gateway
 char static_sn[16] = "255.255.255.0";                   // default subnet
 WiFiServer server(80);
+
 
 //********************* INA226 Settings **********************************
 INA226_WE InaPeri = INA226_WE(0x40);                    // 0x40 = without bridge
@@ -103,12 +102,8 @@ float rangeCharge = 4.0;
 
 
 //********************* other **********************************
-
-
 bool WORKING_TIMEOUT = 0;
 bool mowerIsWorking = 0;                                // Code for Whatsapp
-int column = 2;                                         //used in function scanNetwork. It's for the screen. (Print SSID for each network found)
-bool firstStart = true;
 byte sigCodeInUse = 1;                                  // 1 is the original ardumower sigcode
 int sigDuration = 104;                                  // send the bits each 104 microsecond (Also possible 50)
 int8_t sigcode_norm[128];
@@ -131,14 +126,21 @@ float ChargeCurrent = 0.0;
 float ChargeCurrentPrint = 0.0;
 float ChargeBusVoltage = 0.0;
 float ChargeShuntVoltage = 0.0;
-bool shouldSaveConfig = false;  // flag for saving data
-bool wm_nonblocking = false;    // the captive portal blocks the loop
+bool shouldSaveConfig = false;                          // flag for saving data
+bool wm_nonblocking = false;                            // the captive portal blocks the loop
+unsigned long previousMillis = millis()-1000;           // WhatsApp
+const long interval = 1000;                             // pause interval after sending a WhatsApp-message
+String AutoStartSignalPrint;                            // for the web-part
+String linktext;                                        // for the web-part
+String enableSenderAprint;                              // for the web-part
+String enableSenderBprint;                              // for the web-part
+
 
 /*
   If the Mower is in station and fully charged, the current should be between
   PeriOnOffThreshold(3mA) and ChargeThreshold(10mA)
 
-  If Perimeter starts and mower is in the station, change ChargeThreshold to 0. So you can see the original ChargeCurrent value at http://Your-IP/?
+  If Perimeter starts and mower is in the station, change ChargeThreshold to 0. So you can see the original ChargeCurrent value at http://Your-IP
   If mower is outside, ChargeCurrent should be 0
 */
 float ChargeThreshold = 10.0;               // in mA. If the Chargecurrent is below this value, at  the Display shows "0mA" 
@@ -171,23 +173,27 @@ int8_t sigcode4[] = { 1, 1, 1, -1, -1, -1 };                                    
 //********************* Code for Whatsapp **********************************
 void sendWhatsappMessage(String message){
   #ifdef WhatsApp_messages
-    String API_URL = "https://api.whatabot.net/whatsapp/sendMessage?apikey=" + api_key + "&text=" + urlEncode(message) + "&phone=" + mobile_number;
-    HTTPClient http;
-    http.begin(API_URL);
+    unsigned long currentMillis = millis();
+    if (currentMillis-previousMillis >= interval){
+      previousMillis = currentMillis;
+      String API_URL = "https://api.whatabot.net/whatsapp/sendMessage?apikey=" + api_key + "&text=" + urlEncode(message) + "&phone=" + mobile_number;
+      HTTPClient http;
+      http.begin(API_URL);
 
-    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+      http.addHeader("Content-Type", "application/x-www-form-urlencoded");
   
-    int http_response_code = http.GET();
-    if (http_response_code == 200){
-      Serial.print("Whatsapp message sent successfully");
-    }
-    else{
-      Serial.println("Error sending the message");
-      Serial.print("HTTP response code: ");
-      Serial.println(http_response_code);
-    }
+      int http_response_code = http.GET();
+      if (http_response_code == 200){
+        Serial.print("Whatsapp message sent successfully");
+      }
+      else{
+        Serial.println("Error sending the message");
+        Serial.print("HTTP response code: ");
+        Serial.println(http_response_code);
+      }
 
-    http.end();
+      http.end();
+    }
   #endif
 }
 // End of Code for Whatsapp
@@ -205,19 +211,6 @@ void IRAM_ATTR onTimer() {
     } else if (sigcode_norm[step] == -1) {
       digitalWrite(pinIN1, HIGH);
       digitalWrite(pinIN2, LOW);
-
-    } else {
-      #ifdef SerialOutput
-        Serial.println("ERROR");
-      #endif      
-
-      #ifdef Screen
-        u8x8.clear();
-        u8x8.setCursor(5,5);
-        u8x8.print("ERROR");      
-        delay(5000);
-      #endif
-      //digitalWrite(pinEnableA, LOW);
     }
     step++;
     if (step == sigcode_size) {
@@ -233,19 +226,6 @@ void IRAM_ATTR onTimer() {
     } else if (sigcode_norm[step] == -1) {
       digitalWrite(pinIN3, HIGH);
       digitalWrite(pinIN4, LOW);
-
-    } else {
-        #ifdef SerialOutput
-        Serial.println("ERROR");
-      #endif
-
-      #ifdef Screen
-        u8x8.clear();
-        u8x8.setCursor(5,5);
-        u8x8.print("ERROR");
-        delay(5000);
-      #endif
-      //digitalWrite(pinEnableA, LOW);
     }
     step++;
     if (step == sigcode_size) {
@@ -255,6 +235,7 @@ void IRAM_ATTR onTimer() {
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 // End of Signalmanagement
+
 
 //********************* CHANGE AREA **********************************
 void changeArea(byte areaInMowing) {
@@ -334,13 +315,14 @@ void changeArea(byte areaInMowing) {
 }
 // END ChangeArea
 
+
 //********************* STATICSCREENPARTS **********************************
 void StaticScreenParts() {
 #ifdef Screen
   //line 0: Title
   u8x8.setCursor(0,0);
   u8x8.inverse();
-  u8x8.print(" Teensy Sender  ");
+  u8x8.print(" ESP32 Sender  ");
   u8x8.noInverse();
 
   //line 1: free
@@ -373,12 +355,14 @@ void StaticScreenParts() {
 }
 // END StaticScreenParts
 
+
 //********************* SaveConfigCallback **********************************
 void saveConfigCallback () {  //callback notifying us of the need to save config
   if (debug) Serial.println("Should save config");
   shouldSaveConfig = true;
 }
 // END SaveConfigCallback
+
 
 //********************* SETUP **********************************
 void setup() {
@@ -413,14 +397,14 @@ void setup() {
   
   #ifdef SerialOutput
     Serial.println("START");
-    Serial.print("Teensymower Sender ");
+    Serial.print("ESP32 Sender ");
     Serial.println(VER);
     Serial.print(" USE_PERI_CURRENT=");
     Serial.println(USE_PERI_CURRENT);
   #endif
   #ifdef Screen
     u8x8.println("START");
-    u8x8.println("Teensy Sender");
+    u8x8.println("ESP32 Sender");
     u8x8.print("");u8x8.println(VER);
     u8x8.print("USE_PERI_CURR=");
     u8x8.println(USE_PERI_CURRENT);
@@ -434,6 +418,7 @@ void setup() {
   if (enableSenderB) {
     digitalWrite(pinEnableB, HIGH);
   }
+
 
   //------------------------  WIFI parts  ----------------------------------------
   WiFi.mode(WIFI_STA);
@@ -471,7 +456,7 @@ void setup() {
   _ip.fromString(static_ip);
   _gw.fromString(static_gw);
   _sn.fromString(static_sn);
-  wm.setSTAStaticIPConfig(_ip, _gw, _sn);
+  wm.setSTAStaticIPConfig(_ip, _gw, _sn, _gw); // ip, gateway, subnet, dns
 
   if (!wm.autoConnect("MowerAP","12345678")) { // The password should have at least 8 characters.
     if (debug) Serial.println("Failed to connect - ESP32 restart!");
@@ -498,15 +483,15 @@ void setup() {
     configFile.close();
   }   //end save
 
+  sendWhatsappMessage("ESP32 sender is now online.");          // Code for Whatsapp
   server.begin();
-
 
 
   //------------------------  SCREEN parts  ----------------------------------------
   #ifdef Screen            // 16x8 (??16x9??)
     u8x8.clear();
     u8x8.setCursor(0, 0);  // Set cursor position, start of line 0
-    u8x8.print("TEENSYMOWER");  
+    u8x8.print("DIY MOWER");  
     u8x8.setCursor(0, 1);  // Set cursor position, start of line 1
     u8x8.print("BB SENDER");
     u8x8.setCursor(0, 2);  // Set cursor position, start of line 2
@@ -516,12 +501,13 @@ void setup() {
     delay(3000);
   #endif
   #ifdef SerialOutput
-    Serial.println("TEENSYMOWER");
+    Serial.println("DIY MOWER");
     Serial.println("BB SENDER");
     Serial.println(VER);
     Serial.println("2 LOOPS");
     delay(3000);
   #endif
+
 
   //------------------------  current sensor parts  ----------------------------------------
   #ifdef SerialOutput
@@ -534,6 +520,8 @@ void setup() {
   InaCharge.setAverage(AVERAGE_4);
   InaCharge.setResistorRange(resistorCharge, rangeCharge);
 //  InaCharge.waitUntilConversionCompleted();
+
+
 
   //------------------------  ArduinoOTA  ----------------------------------------
  #ifdef OTAUpdates
@@ -564,11 +552,9 @@ void setup() {
 
   ArduinoOTA.begin();
   #endif
-
-  sendWhatsappMessage("Teensysender is now online.");          // Code for Whatsapp
-
 }
 // END SETUP
+
 
 //********************* LOOP **********************************
 void loop() {
@@ -622,8 +608,6 @@ void loop() {
         #endif
       }
     }
-
- //   if ((WiFi.status() != WL_CONNECTED && APconnected == false)) ScanNetwork();
 
     if (workTimeMins >= WORKING_TIMEOUT_MINS) {
       // switch off perimeter
@@ -814,240 +798,311 @@ void loop() {
   // Check if a client has connected
   WiFiClient client = server.available();
   if (client) {
-  
-    // Read the first line of the request
-    String req = client.readStringUntil('\r');
-    if (req == "") return;
-    #ifdef SerialOutput
-      Serial.print("Client say  ");
-      Serial.println(req);
-      Serial.println("------------------------ - ");
-    #endif
+    unsigned long currentTime = millis();
+    unsigned long previousTime = currentTime;
+    unsigned long timeoutTime = 500;
+    String req;
+    String currentLine;
+    Serial.println("New Client.");
+
+    while (client.connected() && currentTime - previousTime <= timeoutTime) {
+      currentTime = millis();
+      if (client.available()) {             // if there's bytes to read from the client,
+        char c = client.read();             // read a byte, then
+        Serial.write(c);                    // print it out the serial monitor
+        req += c;
+        if (c == '\n') {                    // if the byte is a newline character
+          // if the current line is blank, you got two newline characters in a row.
+          // that's the end of the client HTTP request, so send a response:
+          if (currentLine.length() == 0) {
+
+            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+            // and a content-type so the client knows what's coming, then a blank line:
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-type:text/html");
+            client.println("Connection: close");
+            client.println();
+
+            // Match the request
+            if (req.indexOf("GET /A0") != -1) {
+              enableSenderA = false;
+              workTimeMins = 0;
+              digitalWrite(pinEnableA, LOW);
+              digitalWrite(pinIN1, LOW);
+              digitalWrite(pinIN2, LOW);
+              #ifdef SerialOutput
+                Serial.println("Sender A0 = off");
+              #endif
+            }
+            if (req.indexOf("GET /B0") != -1) {
+              enableSenderB = false;
+              workTimeMins = 0;
+              digitalWrite(pinEnableB, LOW);
+              digitalWrite(pinIN3, LOW);
+              digitalWrite(pinIN4, LOW);
+              #ifdef SerialOutput
+                Serial.println("Sender B0 = off");
+              #endif
+            }
+
+            if (req.indexOf("GET /A1") != -1) {
+              workTimeMins = 0;
+              enableSenderA = true;
+              digitalWrite(pinEnableA, HIGH);
+              digitalWrite(pinIN1, LOW);
+              digitalWrite(pinIN2, LOW);
+              #ifdef SerialOutput
+                Serial.println("Sender A1 = on");
+              #endif
+            }
+
+            if (req.indexOf("GET /B1") != -1) {
+              workTimeMins = 0;
+              enableSenderB = true;
+              digitalWrite(pinEnableB, HIGH);
+              digitalWrite(pinIN3, LOW);
+              digitalWrite(pinIN4, LOW); 
+              #ifdef SerialOutput
+                Serial.println("Sender B1 = on");
+              #endif
+            }
+
+            if (req.indexOf("GET /sigCode0") != -1) {
+              sigCodeInUse = 0;
+              changeArea(sigCodeInUse);
+              #ifdef SerialOutput
+                Serial.println("Signalcode = 0");
+              #endif
+            }
+
+            if (req.indexOf("GET /sigCode1") != -1) {
+              sigCodeInUse = 1;
+              changeArea(sigCodeInUse);
+              #ifdef SerialOutput
+                Serial.println("Signalcode = 1");
+              #endif
+            }
+
+            if (req.indexOf("GET /sigCode2") != -1) {
+              sigCodeInUse = 2;
+              changeArea(sigCodeInUse);
+              #ifdef SerialOutput
+                Serial.println("Signalcode = 2");
+              #endif
+            }
+
+            if (req.indexOf("GET /sigCode3") != -1) {
+              sigCodeInUse = 3;
+              changeArea(sigCodeInUse);
+              #ifdef SerialOutput
+                Serial.println("Signalcode = 3");
+              #endif
+            }
+
+            if (req.indexOf("GET /sigCode4") != -1) {
+              sigCodeInUse = 4;
+              changeArea(sigCodeInUse);
+              #ifdef SerialOutput
+                Serial.println("Signalcode = 4");
+              #endif
+            }
+
+            if (req.indexOf("GET /sigDuration104") != -1) {
+              sigDuration = 104;
+              timerAlarm(timer, 104, true, 0);
+              #ifdef SerialOutput
+                Serial.println("Signalduration = 104");
+              #endif
+            }
+
+            if (req.indexOf("GET /sigDuration50") != -1) {
+              sigDuration = 50;
+              timerAlarm(timer, 50, true, 0);
+              #ifdef SerialOutput
+                Serial.println("Signalduration = 50");
+              #endif
+            }
+
+            if (req.indexOf("GET /AutoMode0") != -1) {
+              AUTO_START_SIGNAL = 0;
+              #ifdef SerialOutput
+                Serial.println("Automode = 0");
+              #endif
+            }
     
-    // Match the request
-    if (req.indexOf("GET /A0") != -1) {
-      enableSenderA = false;
-      workTimeMins = 0;
-      digitalWrite(pinEnableA, LOW);
-      digitalWrite(pinIN1, LOW);
-      digitalWrite(pinIN2, LOW);
-      String sResponse;
-      sResponse = "SENDER A IS OFF";
-  
-      // Send the response to the client
-      #ifdef SerialOutput
-        Serial.println(sResponse);
-      #endif
-      client.print(sResponse);
-      client.flush();
-    }
-    if (req.indexOf("GET /B0") != -1) {
-      enableSenderB = false;
-      workTimeMins = 0;
-      digitalWrite(pinEnableB, LOW);
-      digitalWrite(pinIN3, LOW);
-      digitalWrite(pinIN4, LOW);
-      String sResponse;
-      sResponse = "SENDER B IS OFF";
-  
-      // Send the response to the client
-      #ifdef SerialOutput
-        Serial.println(sResponse);
-      #endif
-      client.print(sResponse);
-      client.flush();
-    }
-    if (req.indexOf("GET /A1") != -1) {
-      workTimeMins = 0;
-      enableSenderA = true;
-      digitalWrite(pinEnableA, HIGH);
-      digitalWrite(pinIN1, LOW);
-      digitalWrite(pinIN2, LOW);
- 
-      // Prepare the response
-      String sResponse;
-      sResponse = "SENDER A IS ON";
- 
-      // Send the response to the client
-      #ifdef SerialOutput
-        Serial.println(sResponse);
-      #endif
-      client.print(sResponse);
-      client.flush();
-    }
-    if (req.indexOf("GET /B1") != -1) {
-      workTimeMins = 0;
-      enableSenderB = true;
-      digitalWrite(pinEnableB, HIGH);
-      digitalWrite(pinIN3, LOW);
-      digitalWrite(pinIN4, LOW);
- 
-      // Prepare the response
-      String sResponse;
-      sResponse = "SENDER B IS ON";
- 
-      // Send the response to the client
-      #ifdef SerialOutput
-        Serial.println(sResponse);
-      #endif
-      client.print(sResponse);
-      client.flush();
-    }
+            if (req.indexOf("GET /AutoMode1") != -1) {
+              AUTO_START_SIGNAL = 1;
+              #ifdef SerialOutput
+                Serial.println("Automode = 1");
+              #endif
+            }
 
-    if (req.indexOf("GET /?") != -1) {
-      String sResponse, sHeader;
-      sResponse = "<html><head><title>TeensySender</title><META HTTP-EQUIV='refresh' CONTENT='5'></head><body><H3>MAC ADRESS = ";
-      sResponse += WiFi.macAddress();
-      sResponse += "<BR>Current chargetime: ";
-      sResponse += workTimeChargeMins;
-      sResponse += "min.<BR>Last charge : ";
-      sResponse += lastChargeMins;
-      sResponse += "min.<BR>Uptime perimeterloop = ";
-      sResponse += workTimeMins;
-      sResponse += "min.<br>Current flow in the perimeter loop = ";
-      sResponse += PeriCurrent;
-      sResponse += "mA<br>Voltage in the perimeterloop = ";
-      sResponse += PeriBusVoltage;
+            // Display the HTMl site
+            client.print("<html><head><title>ESP32 Sender Controlpanel v2.0</title></head><meta http-equiv='refresh' content='5; url=http://");
+            client.print(static_ip);
+            client.println("'><style type='text/css'>body{padding-left: 0em;font-family: Helvetica, Geneva, Arial, SunSans-Regular, sans-serif;color: rgb(125, 0, 0);background-color: rgb(170, 210, 255);}table.fullscreen{border: 1px solid rgb(125, 0, 0);}td.on{border-right: 1em solid rgb(0, 255, 0);}td.off{border-right: 1em solid rgb(255, 0, 0);}h1{font-family: Helvetica, Geneva, Arial, SunSans-Regular, sans-serif;}</style><body>");
+            client.println("<table class='fullscreen'; width='100%'>");
+            client.println("<tr>");
+            client.println("<td><h1 align='center'>ESP32 Sender Controlpanel</h1></td>");
+            client.println("</tr>");
+            client.println("<table align='center'>");
+            client.println("<tr>");
+            client.println("<td>Chargevoltage:</td><td>&nbsp;</td>");
+            client.print("<td>");
+            client.print(ChargeBusVoltage);
+            client.println("V</td>");
+            client.println("</tr>");
+            client.println("<tr>");
+            client.println("<td>Chargecurrent:</td><td>&nbsp;</td>");
+            client.print("<td>");
+            client.print(ChargeCurrentPrint);
+            client.println("mA</td>");
+            client.println("</tr>");
+            client.println("<tr>");
+            client.println("<td>Perimetervoltage:</td><td>&nbsp;</td>");
+            client.print("<td>");
+            client.print(PeriBusVoltage);
+            client.println("V</td>");
+            client.println("</tr>");
+            client.println("<tr>");
+            client.println("<td>Perimetercurrent:</td>");
+            client.println("<td>&nbsp;</td>");
+            client.print("<td>");
+            client.print(PeriCurrent);
+            client.println("mA</td>");
+            client.println("</tr>");
+            client.println("<tr>");
+            client.println("<td>Perimeterloop Uptime:</td>");
+            client.println("<td>&nbsp;</td>");
+            client.print("<td>");
+            client.print(workTimeMins);
+            client.println("min.</td>");
+            client.println("</tr>");
+            client.println("<tr>");
+            client.println("<td>Signalcode:</td>");
+            client.println("<td>&nbsp;</td>");
+            if (sigCodeInUse == 4) {
+              Serial.println("SigCodeInUse = 4 > 0");
+              linktext = "/sigCode0";
+            } else if (sigCodeInUse == 3) {
+              Serial.println("SigCodeInUse = 3 > 4");
+                linktext = "/sigCode4";
+            } else if (sigCodeInUse == 2) {
+                Serial.println("SigCodeInUse= 2 > 3");
+                linktext = "/sigCode3";
+            } else if (sigCodeInUse == 1) {
+                Serial.println("SigCodeInUse= 1 > 2");
+                linktext = "/sigCode2";
+            } else if (sigCodeInUse == 0) {
+                Serial.println("SigCodeInUse= 0 > 1");
+                linktext = "/sigCode1";
+            }
+            client.print("<td><a href='");
+            client.print(linktext);
+            client.print("'>");
+            client.print(sigCodeInUse);
+            client.println("</a></td>");
+            client.println("</tr>");
+            client.println("<tr>");
+            client.println("<td>Sendingspeed:</td>");
+            client.println("<td>&nbsp;</td>");
+            
+            if (sigDuration == 104) {
+              linktext = "/sigDuration50";
+            } else {
+              linktext = "/sigDuration104";
+            }
+            client.print("<td><a href='");
+            client.print(linktext);
+            client.print("'>");
+            client.print(sigDuration);
+            client.println("us/bit</a></td>");
+            client.println("</tr>");
+            client.println("<tr>");
+            client.println("<td>Sender A:</td>");
 
-//    sResponse += "V<br>PeriShuntVoltage= ";      // Shows the PeriShuntVoltage
-//    sResponse += PeriShuntVoltage;
-//    sResponse += "m";
+              if(enableSenderA == true) {
+              enableSenderAprint = "on";
+              linktext = "/A0";
+            } else if (enableSenderA == false) {
+              enableSenderAprint = "off";
+              linktext = "/A1";
+            }
 
-      sResponse += "V<br>Chargecurrent = ";
-      sResponse += ChargeCurrentPrint;
-      sResponse += "mA<br>Chargevoltage = ";
-      sResponse += ChargeBusVoltage;
+            client.print("<td class='");
+            client.print(enableSenderAprint);
+            client.println("'>&nbsp;</td>");
+            client.print("<td><a href='");
+            client.print(linktext);
+            client.print("'>");
+            client.print(enableSenderAprint);
+            client.println("</a></td>");
+            client.println("</tr>");
+            client.println("<tr>");
+            
+            if(enableSenderB == 1) {
+              enableSenderBprint = "on";
+              linktext = "/B0";
+            } else {
+              enableSenderBprint = "off";
+              linktext = "/B1";
+            }
 
-//    sResponse += "V<br>ChargeShuntVoltage= ";      // Shows the ChargeShuntVoltage
-//    sResponse += ChargeShuntVoltage;
-//    sResponse += "m";
+            client.print("<td>Sender B:</td><td class='");
+            client.print(enableSenderBprint);
+            client.print("'>&nbsp;</td>");
+            client.print("<td><a href='");
+            client.print(linktext);
+            client.print("'>");
+            client.print(enableSenderBprint);
+            client.println("</a></td>");
+            client.println("</tr>");
+            client.println("<tr>");
+            client.println("<td>Automaticmode:</td>");
+            
+            if(AUTO_START_SIGNAL == 1) {
+              AutoStartSignalPrint = "on";
+              linktext = "/AutoMode0";
+            } else {
+              AutoStartSignalPrint = "off";
+              linktext = "/AutoMode1";
+            }
 
-      sResponse += "V<br>Sends one bit of the signal every :";
-      sResponse += sigDuration;
-      sResponse += "us<br>Signalcode = ";
-      sResponse += sigCodeInUse;
-      sResponse += "<br>Sender A : ";
-      sResponse += enableSenderA;
-      sResponse += "<br>Sender B : ";
-      sResponse += enableSenderB;
-      sResponse += "</H3></body></html>";
+            client.print("<td class='");
+            client.print(AutoStartSignalPrint);
+            client.print("'>&nbsp;</td>");
+            client.print("<td><a href='");
+            client.print(linktext);
+            client.print("'>");
+            client.print(AutoStartSignalPrint);
+            client.println("</a></td>");
+            client.println("</tr>");
+            client.println("</table>");
+            client.println("</table>");
+            client.println("</body>");
+            client.println("</html>");
 
-      #ifdef SerialOutput
-        Serial.println(sResponse);
-      #endif
-      client.print(sResponse);
-      client.flush();
+            // Variablen
+            // AUTO_START_SIGNAL
+            // workTimeChargeMins;
+            // lastChargeMins;
+            // workTimeMins;
+            // PeriCurrent;
+            // PeriBusVoltage;
+            // PeriShuntVoltage;
+            // ChargeCurrentPrint;
+            // ChargeBusVoltage;
+            // ChargeShuntVoltage;
+            // sigDuration;
+            // sigCodeInUse;
+            // enableSenderA;
+            // enableSenderB;
+            client.flush();
+          }
+        }
+      }
     }
+  }  
 
-    if (req.indexOf("GET /sigCode/0") != -1) {
-      sigCodeInUse = 0;
-      changeArea(sigCodeInUse);
- 
-      // Prepare the response
-      String sResponse;
-      sResponse = "NOW Send Signal 0";
- 
-      // Send the response to the client
-      #ifdef SerialOutput
-        Serial.println(sResponse);
-      #endif
-      client.print(sResponse);
-      client.flush();
-    }
-    if (req.indexOf("GET /sigCode/1") != -1) {
-      sigCodeInUse = 1;
-      changeArea(sigCodeInUse);
- 
-      // Prepare the response
-      String sResponse;
-      sResponse = "NOW Send Signal 1";
- 
-      // Send the response to the client
-      #ifdef SerialOutput
-        Serial.println(sResponse);
-      #endif
-      client.print(sResponse);
-      client.flush();
-    }
-
-    if (req.indexOf("GET /sigCode/2") != -1) {
-      sigCodeInUse = 2;
-      changeArea(sigCodeInUse);
- 
-      // Prepare the response
-      String sResponse;
-      sResponse = "NOW Send Signal 2";
- 
-      // Send the response to the client
-      #ifdef SerialOutput
-        Serial.println(sResponse);
-      #endif
-      client.print(sResponse);
-      client.flush();
-    }
-
-    if (req.indexOf("GET /sigCode/3") != -1) {
-      sigCodeInUse = 3;
-      changeArea(sigCodeInUse);
- 
-      // Prepare the response
-      String sResponse;
-      sResponse = "NOW Send Signal 3";
- 
-      // Send the response to the client
-      #ifdef SerialOutput
-        Serial.println(sResponse);
-      #endif
-      client.print(sResponse);
-      client.flush();
-    }
-
-    if (req.indexOf("GET /sigCode/4") != -1) {
-      sigCodeInUse = 4;
-      changeArea(sigCodeInUse);
- 
-      // Prepare the response
-      String sResponse;
-      sResponse = "NOW Send Signal 4";
- 
-      // Send the response to the client
-      #ifdef SerialOutput
-        Serial.println(sResponse);
-      #endif
-      client.print(sResponse);
-      client.flush();
-    }
-    if (req.indexOf("GET /sigDuration/104") != -1) {
-      sigDuration = 104;
-      timerAlarm(timer, 104, true, 0);
- 
-      // Prepare the response
-      String sResponse;
-      sResponse = "NOW 104 microsecond signal duration";
- 
-      // Send the response to the client
-      #ifdef SerialOutput
-        Serial.println(sResponse);
-      #endif
-      client.print(sResponse);
-      client.flush();
-    }
-
-    if (req.indexOf("GET /sigDuration/50") != -1) {
-      sigDuration = 50;
-      timerAlarm(timer, 50, true, 0);
- 
-      // Prepare the response
-      String sResponse;
-      sResponse = "NOW 50 microsecond signal duration";
- 
-      // Send the response to the client
-      #ifdef SerialOutput
-        Serial.println(sResponse);
-      #endif
-      client.print(sResponse);
-      client.flush();
-    }
-  }
 }
 //END LOOP
