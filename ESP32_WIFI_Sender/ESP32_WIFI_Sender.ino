@@ -516,16 +516,15 @@ void setup() {
 
   InaPeri.setAverage(AVERAGE_4);
   InaPeri.setResistorRange(resistorPeri, rangePeri);
-//  InaPeri.waitUntilConversionCompleted();
   InaCharge.setAverage(AVERAGE_4);
   InaCharge.setResistorRange(resistorCharge, rangeCharge);
-//  InaCharge.waitUntilConversionCompleted();
-
-
+  
 
   //------------------------  ArduinoOTA  ----------------------------------------
- #ifdef OTAUpdates
- ArduinoOTA.onStart([]() {
+  #ifdef OTAUpdates
+  ArduinoOTA.setHostname("ESP32-Sender 3.0");     // Hostname in WiFi
+  // ArduinoOTA.setPassword("admin");             // Need a password?
+ArduinoOTA.onStart([]() {
       String type;
       if (ArduinoOTA.getCommand() == U_FLASH)
         type = "sketch";
